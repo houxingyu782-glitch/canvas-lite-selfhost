@@ -23,6 +23,7 @@ const courses = [
     course_code: 'CS 101',
     term,
     is_favorite: true,
+    apply_assignment_group_weights: true,
     teachers: [{ id: 1, display_name: 'Dr. Ada Lovelace' }],
     enrollments: [{ type: 'student', role: 'StudentEnrollment', computed_current_score: 87.5, computed_current_grade: 'A-' }],
   },
@@ -88,7 +89,7 @@ const assignments101 = [
     points_possible: 50,
     submission_types: ['online_upload'],
     html_url: '/courses/101/assignments/5002',
-    submission: submission({ id: 9002, workflow_state: 'submitted', submitted_at: iso(-2, 18) }),
+    submission: submission({ id: 9002, workflow_state: 'graded', submitted_at: iso(-2, 18), score: 42, grade: '42' }),
   },
   {
     id: 5003,
@@ -107,7 +108,7 @@ const assignments101 = [
     name: 'Final Project Proposal',
     description: '<h3>要求</h3><p>一页 PDF，包含题目、动机、计划。</p><table><tr><th>部分</th><th>占比</th></tr><tr><td>题目</td><td>30%</td></tr></table>',
     due_at: null,
-    points_possible: null,
+    points_possible: 100,
     submission_types: ['online_upload'],
     html_url: '/courses/101/assignments/5004',
     submission: submission({ id: 9004, missing: true }),
@@ -144,6 +145,14 @@ const announcements101 = [
     author: { display_name: 'TA Grace' },
     html_url: '/courses/101/discussion_topics/7002',
   },
+];
+
+// 课程 101 按分组加权：作业 40% / 阅读与测验 20%（去掉最低 1 次）/ 期末项目 40%
+const byId = (id) => assignments101.find((a) => a.id === id);
+const groups101 = [
+  { id: 801, name: 'Problem Sets', position: 1, group_weight: 40, rules: {}, assignments: [byId(5001), byId(5002)] },
+  { id: 802, name: '阅读与测验', position: 2, group_weight: 20, rules: { drop_lowest: 1 }, assignments: [byId(5003), byId(5005)] },
+  { id: 803, name: '期末项目', position: 3, group_weight: 40, rules: {}, assignments: [byId(5004)] },
 ];
 
 const announcements102 = [
@@ -324,6 +333,12 @@ const server = http.createServer((req, res) => {
       headers.link = `<http://127.0.0.1:${PORT}${path}?page=${next}&per_page=${perPage}>; rel="next", <http://127.0.0.1:${PORT}${path}?page=1&per_page=${perPage}>; rel="current"`;
     }
     json(res, 200, items, headers);
+    return;
+  }
+
+  m = path.match(/^\/api\/v1\/courses\/(\d+)\/assignment_groups$/);
+  if (m) {
+    json(res, 200, m[1] === '101' ? groups101 : []);
     return;
   }
 

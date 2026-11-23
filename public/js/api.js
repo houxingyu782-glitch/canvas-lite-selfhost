@@ -279,6 +279,13 @@
         query: { 'include[]': 'submission', order_by: 'due_at' },
       }),
 
+    // 作业分组：含每组权重、去分规则、组内作业和自己的提交得分，用来算每项占比
+    assignmentGroups: (courseId) =>
+      getAll(`/api/v1/courses/${courseId}/assignment_groups`, {
+        perPage: 50,
+        query: { 'include[]': ['assignments', 'submission'] },
+      }),
+
     assignment: (courseId, assignmentId) =>
       request(`/api/v1/courses/${courseId}/assignments/${assignmentId}`, {
         query: { 'include[]': 'submission' },

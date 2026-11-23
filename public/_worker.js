@@ -2,6 +2,11 @@
  * Cloudflare Pages 同源代理：/api/* 转发到学校 Canvas，其余交给静态资源。
  * 这样浏览器不需要跨域，也不需要单独的 Worker 域名。
  */
+// Canvas 前面的 CloudFront 会拒绝没有 User-Agent 的请求（返回 403 HTML），
+// 所以代理必须带一个固定的浏览器标识。
+const UPSTREAM_USER_AGENT =
+  'Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0 Mobile Safari/537.36 CanvasLite/2.0.2';
+
 function httpsOrigin(value) {
   try {
     const url = new URL(String(value || '').trim());
@@ -59,7 +64,11 @@ export default {
       // Cloudflare Workers 不支持 redirect: 'error'（会直接抛错），只能用 manual 自己判断
       upstream = await fetch(target, {
         method: request.method,
-        headers: { Authorization: authorization, Accept: 'application/json' },
+        headers: {
+          Authorization: authorization,
+          Accept: 'application/json',
+          'User-Agent': UPSTREAM_USER_AGENT,
+        },
         redirect: 'manual',
       });
     } catch {

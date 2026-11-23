@@ -179,8 +179,15 @@ async function main() {
   await shot(page, '06-grades.png');
   await page.locator('.grade-courses .grade-row', { hasText: 'Introduction to Programming' }).click();
   await page.waitForURL('**/#/course/101?tab=grades');
-  await page.waitForSelector('#course-body .grade-hero');
-  ok((await page.textContent('#course-body')).includes('18'), '课程成绩明细');
+  await page.waitForSelector('#course-body .grade-calc');
+  const calc = (await page.textContent('#course-body .grade-calc')).replace(/\s+/g, ' ');
+  ok(calc.includes('86%') && calc.includes('按分组加权'), '按分组权重算出当前得分 86%');
+  ok(calc.includes('已拿到 23.2%') && calc.includes('未评分 73.3%'), '显示已拿到 / 未评分占比');
+  ok(calc.includes('剩余平均需 57%'), '算出达到 65 分需要的剩余平均分');
+  const lab = (await page.locator('.grade-item', { hasText: 'Lab 3 Report' }).textContent()).replace(/\s+/g, ' ');
+  ok(lab.includes('占总评 13.3%') && lab.includes('已得 11.2%'), '每项作业显示占比和已得分');
+  ok((await page.textContent('#course-body')).includes('去掉最低 1 次'), '显示分组去分规则');
+  await shot(page, '06b-course-grades.png');
 
   console.log('\n[8] 课程概览与作业');
   await page.locator('.tabs a', { hasText: '概览' }).click();

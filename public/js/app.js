@@ -12,7 +12,7 @@
 
   const API = window.CanvasAPI;
   const config = API.loadConfig();
-  const VERSION = '2.0.2';
+  const VERSION = '2.1.0';
 
   const root = document.documentElement;
   const app = document.getElementById('app');
@@ -1557,10 +1557,18 @@
       html = res.ok ? modulesHtml(res.data, course, query.get('module')) : errorBox(res.error);
       if (!res.ok && handleAuthError(res.error)) return;
     } else {
-      const res = await load(`assignments:${course.id}`, 60000, () => API.assignments(course.id));
+      // 优先用作业分组算占比；拿不到分组（学校关了接口等）就退回只列已评分作业
+      const res = await load(`groups:${course.id}`, 60000, () => API.assignmentGroups(course.id));
       if (stale(seq)) return;
-      html = res.ok ? courseGradesHtml(res.data, course) : errorBox(res.error);
       if (!res.ok && handleAuthError(res.error)) return;
+      if (res.ok && window.CanvasGrades) {
+        html = gradeBreakdownHtml(res.data, course);
+      } else {
+        const fallback = await load(`assignments:${course.id}`, 60000, () => API.assignments(course.id));
+        if (stale(seq)) return;
+        if (!fallback.ok && handleAuthError(fallback.error)) return;
+        html = fallback.ok ? courseGradesHtml(fallback.data, course) : errorBox(fallback.error);
+      }
     }
     body.innerHTML = html;
 
@@ -1765,6 +1773,99 @@
     return `<a class="module-item" href="${esc(href)}" target="_blank" rel="noopener"${indent}>
       <span class="mi-ico">${icon(ic)}</span><span class="mi-title">${title}</span><span class="mi-type">${label}</span>${icon('external', 'row-arrow')}
     </a>`;
+  }
+
+  /* ---------- 成绩构成：每项占比 + 已得分 ---------- */
+
+  function fmtPct(value) {
+    if (value == null || !Number.isFinite(value)) return '—';
+    const abs = Math.abs(value);
+    const text = abs >= 10 ? value.toFixed(1) : value.toFixed(2);
+    return text.replace(/\.?0+$/, '') || '0';
+  }
+
+  const GRADE_TARGETS = [50, 65, 75, 85];
+
+  function gradeBreakdownHtml(groups, course) {
+    const r = window.CanvasGrades.computeCourseGrade(groups, { weighted: !!course.apply_assignment_group_weights });
+    const canvas = courseGrade(course);
+    const counting = r.groups.some((g) => g.items.some((x) => x.state === 'graded' || x.state === 'pending'));
+    if (!counting) {
+      return `${canvas.score != null ? `<div class="grade-hero card"><div><p class="muted">Canvas 当前成绩</p><p class="big-score">${esc(formatScore(canvas.score))}<small>%</small></p></div></div>` : ''}
+        ${emptyState('chart', '这门课还没有计分的作业', '老师发布带分值的作业后，这里会算出每项占比')}`;
+    }
+    const color = courseColor(course);
+    const differs = canvas.score != null && r.current != null && Math.abs(canvas.score - r.current) >= 0.1;
+    const w = (x) => Math.max(0, Math.min(100, x));
+
+    const targets = GRADE_TARGETS.map((t) => {
+      const need = r.needed(t);
+      let text;
+      let tone;
+      if (need === 0) { text = '已稳拿'; tone = 'ok'; }
+      else if (need > 100) { text = '已无法达到'; tone = 'muted'; }
+      else { text = `剩余平均需 ${fmtPct(need)}%`; tone = need > 85 ? 'danger' : need > 65 ? 'warn' : 'normal'; }
+      return `<div class="target tone-${tone}"><b>${t}</b><span>${esc(text)}</span></div>`;
+    }).join('');
+
+    const summary = `<div class="card grade-calc" style="--c:${color}">
+      <div class="gc-top">
+        <div>
+          <p class="muted">当前得分 <small>（只按已评分作业）</small></p>
+          <p class="big-score">${r.current != null ? esc(fmtPct(r.current)) + '<small>%</small>' : '—'}</p>
+          ${canvas.score != null ? `<p class="muted gc-canvas">Canvas 显示 ${esc(formatScore(canvas.score))}%${canvas.grade ? ' · ' + esc(canvas.grade) : ''}${differs ? '（Canvas 可能还用了这里拿不到的规则，以 Canvas 为准）' : ''}</p>` : ''}
+        </div>
+        <div class="gh-side">
+          <p>${r.weighted ? '按分组加权' : '按分值合计'}</p>
+          <p>已评分 <b>${esc(fmtPct(r.gradedWeight))}%</b> / 100%</p>
+        </div>
+      </div>
+      <div class="gc-bar" role="img" aria-label="总评构成：已拿到 ${esc(fmtPct(r.earned))}%，已扣 ${esc(fmtPct(r.lost))}%，未评分 ${esc(fmtPct(r.remaining))}%">
+        <span class="gc-earned" style="width:${w(r.earned)}%"></span><span class="gc-lost" style="width:${w(r.lost)}%"></span>
+      </div>
+      <div class="gc-legend">
+        <span><i class="gc-earned"></i>已拿到 <b>${esc(fmtPct(r.earned))}%</b></span>
+        <span><i class="gc-lost"></i>已扣 <b>${esc(fmtPct(r.lost))}%</b></span>
+        <span><i class="gc-rest"></i>未评分 <b>${esc(fmtPct(r.remaining))}%</b></span>
+      </div>
+      ${r.remaining > 0 || r.earned < GRADE_TARGETS[GRADE_TARGETS.length - 1] ? `<p class="gc-sub">总评要达到…</p><div class="targets">${targets}</div>` : ''}
+    </div>`;
+
+    const STATE = {
+      graded: null, pending: ['muted', '未评分'], excused: ['muted', '免交'], excluded: ['muted', '不计入'], dropped: ['warn', '已丢弃'],
+    };
+    const groupsHtml = r.groups.filter((g) => g.items.length).map((g) => {
+      const rules = [];
+      if (g.rules && g.rules.drop_lowest) rules.push(`去掉最低 ${g.rules.drop_lowest} 次`);
+      if (g.rules && g.rules.drop_highest) rules.push(`去掉最高 ${g.rules.drop_highest} 次`);
+      return `<section class="section grade-group">
+        <div class="section-head">
+          <h2>${esc(g.name)}</h2>
+          <span class="gg-meta">占总评 <b>${esc(fmtPct(g.weight))}%</b>${g.pct != null ? ` · 组内 ${esc(fmtPct(g.pct))}%` : ''}</span>
+        </div>
+        <div class="gg-bar"><span style="width:${g.weight > 0 ? w((g.earned / g.weight) * 100) : 0}%"></span></div>
+        <p class="gg-note">已拿到 ${esc(fmtPct(g.earned))}% / ${esc(fmtPct(g.weight))}%${rules.length ? ' · ' + esc(rules.join('，')) : ''}</p>
+        <div class="card list">${g.items.map((x) => {
+          const st = STATE[x.state];
+          const counts = x.state === 'graded' || x.state === 'pending';
+          return `<a class="row grade-item ${counts ? '' : 'is-done'}" href="#/course/${course.id}/a/${esc(x.id)}?from=grades">
+            <span class="row-main">
+              <span class="row-title">${esc(x.name)}</span>
+              <span class="row-meta">
+                <span>占总评 <b>${counts ? esc(fmtPct(x.weight)) + '%' : '—'}</b></span>
+                ${x.state === 'graded' ? `<span>已得 <b class="t-ok">${esc(fmtPct(x.earned))}%</b></span>` : ''}
+                ${st ? chip(st[0], st[1]) : ''}
+              </span>
+            </span>
+            <span class="gr-num">${x.score != null
+              ? `<b>${esc(formatScore(x.score))}</b><small>/ ${esc(formatScore(x.possible))}</small>${x.pct != null ? `<em>${esc(fmtPct(x.pct))}%</em>` : ''}`
+              : `<small>满分 ${esc(formatScore(x.possible))}</small>`}</span>
+          </a>`;
+        }).join('')}</div>
+      </section>`;
+    }).join('');
+
+    return summary + groupsHtml + `<p class="page-foot">占比按 Canvas 里的作业分组${r.weighted ? '权重' : '分值'}计算；去分规则只按已评分作业估算。最终成绩以 Canvas 为准。</p>`;
   }
 
   function courseGradesHtml(assignments, course) {

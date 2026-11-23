@@ -1,12 +1,13 @@
 /* Canvas Lite · Service Worker
  * 只缓存应用外壳；Canvas 数据永远走网络，避免看到过期成绩。
  */
-const VERSION = 'canvas-lite-v2.0.2';
+const VERSION = 'canvas-lite-v2.1.0';
 const SHELL = [
   './',
   './index.html',
   './css/style.css',
   './js/api.js',
+  './js/grades.js',
   './js/app.js',
   './manifest.webmanifest',
   './icons/icon.svg',

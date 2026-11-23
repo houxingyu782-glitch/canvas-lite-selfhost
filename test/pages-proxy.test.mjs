@@ -52,7 +52,11 @@ test('Pages forwards reads to the configured origin and preserves Canvas paginat
     `${origin}/api/v1/courses?page=2`,
     {
       method: 'GET',
-      headers: { Authorization: 'Bearer test-only-token', Accept: 'application/json' },
+      headers: {
+        Authorization: 'Bearer test-only-token',
+        Accept: 'application/json',
+        'User-Agent': 'Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0 Mobile Safari/537.36 CanvasLite/2.0.2',
+      },
       redirect: 'manual',
     },
   ]);
