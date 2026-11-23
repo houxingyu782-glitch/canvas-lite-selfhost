@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="zh-CN" data-theme="light">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Canvas Lite</title>
+  <meta name="description" content="用个人 API 令牌访问 Canvas：今日安排、课程、公告、成绩，一个轻快的网页客户端。">
+  <meta name="theme-color" content="#f4f5f8">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="Canvas">
+  <meta name="referrer" content="no-referrer">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" href="icons/icon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="icons/icon-192.png">
+  <link rel="stylesheet" href="css/style.css">
+  <script>
+    // 部署到 Cloudflare Pages 时，由 _worker.js 根据 CANVAS_ORIGIN 转发同源 /api 请求。
+    window.__CANVAS_LITE_SAME_ORIGIN__ = 1;
+  </script>
+  <!--LOCAL_SERVER-->
+</head>
+<body>
+  <a class="skip-link" href="#app">跳到主要内容</a>
+
+  <div class="shell" id="shell">
+    <!-- 桌面侧栏：主导航 + 课程 + 账号 -->
+    <aside id="sidebar" class="sidebar" aria-label="侧栏" hidden></aside>
+
+    <main id="app" class="app" tabindex="-1"></main>
+  </div>
+
+  <!-- 详情面板：桌面从右侧滑出，手机全屏；底下的列表保持原位 -->
+  <div id="panel-scrim" class="panel-scrim" hidden></div>
+  <section id="panel" class="panel" role="dialog" aria-modal="false" aria-label="详情" hidden>
+    <div id="panel-body" class="panel-body"></div>
+  </section>
+
+  <!-- 手机底部导航 -->
+  <nav id="tabbar" class="tabbar" hidden aria-label="主导航"></nav>
+
+  <!-- 底部弹层（手机切换课程）与全局搜索 -->
+  <div id="sheet" class="sheet" hidden></div>
+  <div id="palette" class="palette" hidden></div>
+
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+
+  <noscript>
+    <p style="padding:24px;font-family:system-ui,sans-serif">Canvas Lite 需要启用 JavaScript。</p>
+  </noscript>
+
+  <script src="js/api.js" defer></script>
+  <script src="js/app.js" defer></script>
+</body>
+</html>

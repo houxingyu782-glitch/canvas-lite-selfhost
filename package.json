@@ -1,0 +1,17 @@
+{
+  "name": "canvas-lite",
+  "version": "2.0.0",
+  "private": true,
+  "description": "用个人 API 令牌访问 Canvas 的轻量网页客户端",
+  "type": "module",
+  "scripts": {
+    "start": "node server/server.mjs",
+    "mock": "node test/mock-canvas.mjs",
+    "test": "node --test test/pages-proxy.test.mjs && node test/e2e.mjs",
+    "icons": "node test/make-icons.mjs"
+  },
+  "devDependencies": {
+    "playwright": "^1.56.0",
+    "wrangler": "^4.166.0"
+  }
+}

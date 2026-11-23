@@ -1,0 +1,57 @@
+{
+  "name": "Canvas Lite",
+  "short_name": "Canvas",
+  "description": "用个人 API 令牌访问 Canvas：今日安排、课程、公告、成绩。",
+  "lang": "zh-CN",
+  "dir": "ltr",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#f5f6fa",
+  "theme_color": "#4f46e5",
+  "categories": [
+    "education",
+    "productivity"
+  ],
+  "icons": [
+    {
+      "src": "icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "icons/maskable-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    },
+    {
+      "src": "icons/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "今天",
+      "url": "./index.html#/home"
+    },
+    {
+      "name": "公告",
+      "url": "./index.html#/feed"
+    },
+    {
+      "name": "成绩",
+      "url": "./index.html#/grades"
+    }
+  ]
+}
