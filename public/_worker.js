@@ -56,13 +56,17 @@ export default {
 
     let upstream;
     try {
+      // Cloudflare Workers 不支持 redirect: 'error'（会直接抛错），只能用 manual 自己判断
       upstream = await fetch(target, {
         method: request.method,
         headers: { Authorization: authorization, Accept: 'application/json' },
-        redirect: 'error',
+        redirect: 'manual',
       });
     } catch {
-      return error('代理无法连接 Canvas。请检查 CANVAS_ORIGIN 是否为学校的最终 HTTPS 地址。', 502);
+      return error('代理无法连接 Canvas，请稍后再试。', 502);
+    }
+    if (upstream.status >= 300 && upstream.status < 400) {
+      return error('Canvas 返回了重定向。请把 CANVAS_ORIGIN 改成学校 Canvas 跳转后的最终 HTTPS 地址。', 502);
     }
 
     const out = new Headers();

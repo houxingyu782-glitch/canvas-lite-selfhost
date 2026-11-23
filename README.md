@@ -95,7 +95,8 @@ npx wrangler pages deploy public --project-name my-canvas-lite --branch main
 | --- | --- |
 | 请在 Cloudflare Pages 设置中配置 CANVAS_ORIGIN | 没有设置变量，或格式不对（必须是 `https://` 开头、只到域名）。设置后重新部署 |
 | 登录页的 Canvas 地址必须与站点配置的 CANVAS_ORIGIN 一致 | 登录页填的地址和 `CANVAS_ORIGIN` 不同。在「设置 → 退出登录」后用预填的地址重新登录 |
-| 代理无法连接 Canvas | `CANVAS_ORIGIN` 不是最终地址（学校地址会跳转到别的域名），换成跳转后的地址再部署 |
+| Canvas 返回了重定向 | `CANVAS_ORIGIN` 不是最终地址（学校地址会跳转到别的域名），换成跳转后的地址再部署 |
+| 代理无法连接 Canvas | Cloudflare 暂时连不上学校 Canvas，稍后刷新重试 |
 | Canvas 令牌无效或已过期 | 令牌复制不完整或已被撤销，回 Canvas 重新生成 |
 | 请求太频繁 | Canvas 对每个账号每 10 分钟有请求上限，等几分钟再刷新 |
 | 「公告」页没有内容 | 只显示最近 45 天的公告；如果提示加载失败，点右上角刷新重试 |

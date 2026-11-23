@@ -53,7 +53,7 @@ test('Pages forwards reads to the configured origin and preserves Canvas paginat
     {
       method: 'GET',
       headers: { Authorization: 'Bearer test-only-token', Accept: 'application/json' },
-      redirect: 'error',
+      redirect: 'manual',
     },
   ]);
 });
@@ -83,5 +83,24 @@ test('Pages does not rewrite non-HTML assets', async () => {
     ...env,
   });
   assert.equal(await response.text(), script);
+});
+
+test('Pages reports an upstream redirect instead of following it', async (t) => {
+  // Workers 只认 follow / manual，传 error 会直接抛错，这里守住这个约束
+  const upstream = t.mock.method(globalThis, 'fetch', (input, init) => {
+    if (!['follow', 'manual'].includes(init.redirect)) throw new TypeError(`Invalid redirect value: ${init.redirect}`);
+    return new Response(null, { status: 302, headers: { Location: 'https://elsewhere.example.edu/login' } });
+  });
+  const response = await worker.fetch(canvasRequest(), env);
+  assert.equal(upstream.mock.calls[0].arguments[1].redirect, 'manual');
+  assert.equal(response.status, 502);
+  assert.match((await response.json()).errors[0].message, /重定向/);
+});
+
+test('Pages reports a network failure', async (t) => {
+  t.mock.method(globalThis, 'fetch', () => Promise.reject(new TypeError('network')));
+  const response = await worker.fetch(canvasRequest(), env);
+  assert.equal(response.status, 502);
+  assert.match((await response.json()).errors[0].message, /无法连接/);
 });
 
