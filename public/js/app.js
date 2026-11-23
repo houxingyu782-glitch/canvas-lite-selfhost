@@ -1946,6 +1946,7 @@
       return;
     }
     const courses = state.courses || [];
+
     // 成绩构成估算：和课程成绩页同一套算法，主分数仍用 Canvas 官方成绩
     const estimates = new Map();
     await Promise.all(courses.map(async (c) => {

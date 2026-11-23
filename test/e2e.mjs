@@ -175,6 +175,7 @@ async function main() {
   await page.waitForSelector('.grade-hero');
   body = await page.textContent('#app');
   ok(body.includes('84.3'), '已出分课程平均分 84.3');
+  ok(body.includes('构成估算'), '成绩页显示构成估算');
   ok(body.includes('Reading Response: Clean Code'), '最近出分列出已评分作业');
   await shot(page, '06-grades.png');
   await page.locator('.grade-courses .grade-row', { hasText: 'Introduction to Programming' }).click();
