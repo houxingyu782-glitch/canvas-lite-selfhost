@@ -158,7 +158,7 @@ public/
   js/grades.js     成绩构成计算
   css/style.css
 server/server.mjs  本地静态托管 + 代理
-test/              单元测试、端到端测试、模拟 Canvas
+test/              单元测试、端到端测试、模拟 Canvas、真实账号巡检
 docs/screenshots/  说明文档截图
 ```
 
