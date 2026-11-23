@@ -6,6 +6,25 @@
 
 Canvas Lite **只读**：提交作业、测验、讨论回复等操作仍在学校 Canvas 完成。
 
+- 只想用（已经有人帮你部署好）：看 [使用说明.md](使用说明.md)
+- 要修改代码或长期维护：看 [维护说明.md](维护说明.md)
+
+<img src="docs/screenshots/desktop.png" width="720" alt="桌面版：侧栏、作业列表和右侧详情面板">
+
+<p>
+  <img src="docs/screenshots/home.png" width="180" alt="今天">
+  <img src="docs/screenshots/feed.png" width="180" alt="公告汇总">
+  <img src="docs/screenshots/course.png" width="180" alt="课程概览">
+  <img src="docs/screenshots/course-grades.png" width="180" alt="成绩构成">
+  <img src="docs/screenshots/assignment.png" width="180" alt="作业详情">
+  <img src="docs/screenshots/courses.png" width="180" alt="课程列表">
+  <img src="docs/screenshots/grades.png" width="180" alt="成绩">
+  <img src="docs/screenshots/search.png" width="180" alt="搜索">
+  <img src="docs/screenshots/home-dark.png" width="180" alt="深色模式">
+</p>
+
+<sub>截图使用测试用的模拟数据。</sub>
+
 ## 功能
 
 - **今天**：逾期 / 今天截止 / 7 天内 / 未读公告四个数字，未来 7 天日期条，按天分组的作业和日程时间线，可隐藏已完成
@@ -140,9 +159,10 @@ public/
   css/style.css
 server/server.mjs  本地静态托管 + 代理
 test/              单元测试、端到端测试、模拟 Canvas
+docs/screenshots/  说明文档截图
 ```
 
-改了 `public/` 下的文件，记得同时改 `public/js/app.js`、`public/sw.js` 和 `package.json` 里的版本号，否则浏览器的 Service Worker 会继续用旧缓存。
+改了 `public/` 下的文件，记得同时改 `public/js/app.js`、`public/sw.js` 和 `package.json` 里的版本号，否则浏览器的 Service Worker 会继续用旧缓存。工作约定、代码地图、部署后验收和踩过的坑都在 [维护说明.md](维护说明.md)。
 
 ## 使用许可
 
