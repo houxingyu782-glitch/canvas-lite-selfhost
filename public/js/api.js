@@ -319,6 +319,10 @@
     page: (courseId, slug) =>
       request(`/api/v1/courses/${courseId}/pages/${encodeURIComponent(slug)}`).then((res) => res.data),
 
+    // 课程左侧导航（含 Ed Discussion 等外部工具）；学生看不到被隐藏的栏目
+    tabs: (courseId) =>
+      request(`/api/v1/courses/${courseId}/tabs`).then((res) => (Array.isArray(res.data) ? res.data : [])),
+
     modules: (courseId) =>
       request(`/api/v1/courses/${courseId}/modules`, {
         query: { 'include[]': 'items', per_page: 100 },

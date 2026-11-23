@@ -414,6 +414,26 @@ const server = http.createServer((req, res) => {
     return;
   }
 
+  m = path.match(/^\/api\/v1\/courses\/(\d+)\/tabs$/);
+  if (m) {
+    const id = m[1];
+    const base = [
+      { id: 'home', label: 'Home', type: 'internal', html_url: `/courses/${id}` },
+      { id: 'modules', label: 'Modules', type: 'internal', html_url: `/courses/${id}/modules` },
+    ];
+    // 101 有 Ed Discussion；102 只有别的外部工具和一个被隐藏的 Ed，不应显示入口
+    const extra = id === '101'
+      ? [{ id: 'context_external_tool_501', label: 'Ed Discussion', type: 'external', html_url: `/courses/${id}/external_tools/501` }]
+      : id === '102'
+        ? [
+          { id: 'context_external_tool_601', label: 'Echo360', type: 'external', html_url: `/courses/${id}/external_tools/601` },
+          { id: 'context_external_tool_602', label: 'Ed Discussion', type: 'external', hidden: true, html_url: `/courses/${id}/external_tools/602` },
+        ]
+        : [];
+    json(res, 200, [...base, ...extra]);
+    return;
+  }
+
   m = path.match(/^\/api\/v1\/courses\/(\d+)\/enrollments$/);
   if (m) {
     json(res, 200, []);

@@ -12,7 +12,7 @@
 
   const API = window.CanvasAPI;
   const config = API.loadConfig();
-  const VERSION = '2.1.2';
+  const VERSION = '2.2.0';
 
   const root = document.documentElement;
   const app = document.getElementById('app');
@@ -1525,12 +1525,13 @@
           </div>
           <nav class="tabs" role="tablist" aria-label="课程栏目">
             ${COURSE_TABS.map(([key, label]) => `<a role="tab" aria-selected="${tab === key}" data-replace-route class="${tab === key ? 'on' : ''}"
-              href="#/course/${course.id}${key === 'overview' ? '' : '?tab=' + key}">${label}</a>`).join('')}
+              href="#/course/${course.id}${key === 'overview' ? '' : '?tab=' + key}">${label}</a>${key === 'modules' ? edSlotHtml(course) : ''}`).join('')}
           </nav>
         </header>
         <div id="course-body" class="course-body">${keepScroll ? '' : skeleton('list')}</div>
       </div>`;
 
+    fillEdSlot(course, seq, force);
     const body = $('#course-body');
     const load = (key, ttl, loader) => settle(cached(key, ttl, loader, force));
     let html;
@@ -1589,6 +1590,45 @@
     });
   }
 
+  // Ed Discussion 是挂在课程导航里的外部工具（LTI），只能经 Canvas 启动：找到就在「模块」旁放一个外链
+  const ED_TAB_TTL = 6 * 3600 * 1000;
+  function edDiscussionTab(tabs) {
+    return (tabs || []).find((t) => t && !t.hidden && t.html_url
+      && (t.type === 'external' || /\/external_tools\//.test(t.html_url))
+      && /^\s*ed\s*$|\bed\s*discussion\b|\bedstem\b/i.test(t.label || ''));
+  }
+
+  function edLinkHtml(tab) {
+    return `<a class="tab-ext" data-ed-link href="${esc(canvasHref(tab.html_url))}" target="_blank" rel="noopener"
+      title="在 Canvas 中打开 Ed Discussion">Ed 讨论${icon('external')}</a>`;
+  }
+
+  function edQuickHtml(tab) {
+    return `<a class="quick" data-ed-quick href="${esc(canvasHref(tab.html_url))}" target="_blank" rel="noopener">${icon('chat')}<span><b>Ed Discussion</b><small>课程讨论区，在 Canvas 中打开</small></span>${icon('external', 'row-arrow')}</a>`;
+  }
+
+  // 栏目条和概览「课程资料」各留一个位置：导航数据已缓存就直接画，否则先占位，拿到后再填
+  function edSlotHtml(course) {
+    const ed = edDiscussionTab(peek(`tabs:${course.id}`));
+    return ed ? edLinkHtml(ed) : '<span id="ed-slot" hidden></span>';
+  }
+
+  function edQuickSlotHtml(course) {
+    const ed = edDiscussionTab(peek(`tabs:${course.id}`));
+    return ed ? edQuickHtml(ed) : '<span id="ed-quick-slot" hidden></span>';
+  }
+
+  async function fillEdSlot(course, seq, force) {
+    const res = await settle(cached(`tabs:${course.id}`, ED_TAB_TTL, () => API.tabs(course.id), force));
+    if (stale(seq) || !res.ok) return;
+    const ed = edDiscussionTab(res.data);
+    if (!ed) return;
+    const slot = $('#ed-slot');
+    if (slot) slot.outerHTML = edLinkHtml(ed);
+    const quick = $('#ed-quick-slot');
+    if (quick) quick.outerHTML = edQuickHtml(ed);
+  }
+
   function overviewHtml(course, aRes, nRes) {
     const assignments = aRes.ok ? aRes.data || [] : [];
     const now = new Date();
@@ -1629,6 +1669,7 @@
           <div class="quick-links">
             <a class="quick" href="#/course/${course.id}/front?from=overview">${icon('home')}<span><b>课程主页</b><small>老师写的课程说明</small></span>${icon('right', 'row-arrow')}</a>
             <a class="quick" href="#/course/${course.id}?tab=modules" data-replace-route>${icon('layers')}<span><b>模块</b><small>讲义、页面、文件</small></span>${icon('right', 'row-arrow')}</a>
+            ${edQuickSlotHtml(course)}
           </div>
         </section>
       </div>`;

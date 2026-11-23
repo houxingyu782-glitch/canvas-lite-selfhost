@@ -196,6 +196,12 @@ async function main() {
   await page.waitForSelector('.ov-stats');
   body = await page.textContent('#course-body');
   ok(body.includes('Problem Set 4') && body.includes('周四的课改到线上'), '概览显示接下来和最新公告');
+  const edLink = page.locator('.tabs a[data-ed-link]');
+  ok(await edLink.waitFor({ timeout: 8000 }).then(() => true, () => false), '有 Ed Discussion 的课程显示「Ed 讨论」入口');
+  ok((await edLink.getAttribute('href') || '').endsWith('/courses/101/external_tools/501')
+    && (await edLink.getAttribute('target')) === '_blank', 'Ed 入口在新标签页打开 Canvas 里的工具');
+  ok((await page.$$eval('.tabs a', (els) => els.map((e) => e.textContent.trim()))).join('|').includes('模块|Ed 讨论'), 'Ed 入口紧挨在「模块」后面');
+  ok(await page.locator('#course-body .quick[data-ed-quick]').waitFor({ timeout: 8000 }).then(() => true, () => false), '概览「课程资料」里也有 Ed Discussion 卡片');
   await shot(page, '07-course.png');
   await page.locator('.tabs a', { hasText: '作业' }).click();
   await page.waitForURL('**/#/course/101?tab=assignments');
@@ -273,6 +279,8 @@ async function main() {
   await page.waitForURL('**/#/course/102?tab=announcements');
   ok(await page.locator('#course-body .ann-row', { hasText: 'Homework 8 截止时间提醒' }).waitFor({ timeout: 8000 }).then(() => true, () => false), '切课后保留当前栏目');
   ok(await page.locator('#sheet').isHidden(), '切课后弹层收起');
+  await page.waitForTimeout(300);
+  ok(await page.locator('.tabs a[data-ed-link]').count() === 0, '没有 Ed（或 Ed 被隐藏）的课程不显示入口');
 
   console.log('\n[13] 搜索');
   await page.goto(`${APP}/#/home`);
