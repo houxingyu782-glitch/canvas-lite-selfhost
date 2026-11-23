@@ -20,11 +20,23 @@ function error(message, status, headers = {}) {
   });
 }
 
+/** 首页 HTML 里预填学校地址，登录时只需粘贴令牌 */
+async function withCanvasBase(response, canvasOrigin) {
+  const type = response.headers.get('content-type') || '';
+  if (!canvasOrigin || response.status !== 200 || !type.includes('text/html')) return response;
+  const html = await response.text();
+  const script = `<script>window.__CANVAS_LITE_BASE__=${JSON.stringify(canvasOrigin).replace(/</g, '\\u003c')}</script>`;
+  const headers = new Headers(response.headers);
+  headers.delete('content-length');
+  headers.delete('etag');
+  return new Response(html.replace('<!--LOCAL_SERVER-->', script), { status: 200, headers });
+}
+
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
     if (!url.pathname.startsWith('/api/') && !url.pathname.startsWith('/svc/')) {
-      return env.ASSETS.fetch(request);
+      return withCanvasBase(await env.ASSETS.fetch(request), httpsOrigin(env.CANVAS_ORIGIN));
     }
 
     if (request.method !== 'GET' && request.method !== 'HEAD') {

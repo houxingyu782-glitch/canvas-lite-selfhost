@@ -12,7 +12,7 @@
 
   const API = window.CanvasAPI;
   const config = API.loadConfig();
-  const VERSION = '2.0.0';
+  const VERSION = '2.0.1';
 
   const root = document.documentElement;
   const app = document.getElementById('app');

@@ -57,3 +57,31 @@ test('Pages forwards reads to the configured origin and preserves Canvas paginat
     },
   ]);
 });
+
+const page = '<html><head><!--LOCAL_SERVER--></head><body>Canvas Lite</body></html>';
+const htmlAssets = { ASSETS: { fetch: () => new Response(page, { headers: { 'Content-Type': 'text/html; charset=utf-8', ETag: '"abc"' } }) } };
+
+test('Pages pre-fills the configured Canvas address on the login page', async () => {
+  const response = await worker.fetch(new Request(site), { ...htmlAssets, ...env });
+  const html = await response.text();
+  assert.ok(html.includes(`<script>window.__CANVAS_LITE_BASE__=${JSON.stringify(origin)}</script>`));
+  assert.ok(!html.includes('<!--LOCAL_SERVER-->'));
+  assert.equal(response.headers.get('ETag'), null);
+});
+
+test('Pages leaves HTML untouched without a valid CANVAS_ORIGIN', async () => {
+  for (const configuration of [{}, { CANVAS_ORIGIN: 'http://canvas.example.edu' }, { CANVAS_ORIGIN: 'https://canvas.example.edu/</script>' }]) {
+    const html = await (await worker.fetch(new Request(site), { ...htmlAssets, ...configuration })).text();
+    assert.equal(html, page);
+  }
+});
+
+test('Pages does not rewrite non-HTML assets', async () => {
+  const script = 'console.log("<!--LOCAL_SERVER-->")';
+  const response = await worker.fetch(new Request(`${site}/js/app.js`), {
+    ASSETS: { fetch: () => new Response(script, { headers: { 'Content-Type': 'text/javascript' } }) },
+    ...env,
+  });
+  assert.equal(await response.text(), script);
+});
+

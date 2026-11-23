@@ -1,6 +1,6 @@
 {
   "name": "canvas-lite",
-  "version": "2.0.0",
+  "version": "2.0.1",
   "private": true,
   "description": "用个人 API 令牌访问 Canvas 的轻量网页客户端",
   "type": "module",
