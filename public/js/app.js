@@ -12,7 +12,7 @@
 
   const API = window.CanvasAPI;
   const config = API.loadConfig();
-  const VERSION = '2.1.0';
+  const VERSION = '2.1.2';
 
   const root = document.documentElement;
   const app = document.getElementById('app');
@@ -588,6 +588,7 @@
         const course = list[i];
         await prefetchKey(`assignments:${course.id}`, () => API.assignments(course.id));
         if (i < 3) await prefetchKey(`modules:${course.id}`, () => API.modules(course.id));
+        if (i < 4) await prefetchKey(`groups:${course.id}`, () => API.assignmentGroups(course.id));
       }
     };
     if (window.requestIdleCallback) window.requestIdleCallback(run, { timeout: 3000 });
@@ -1945,9 +1946,28 @@
       return;
     }
     const courses = state.courses || [];
-    const graded = courses.filter((c) => courseGrade(c).score != null);
-    const avg = graded.length ? graded.reduce((s, c) => s + courseGrade(c).score, 0) / graded.length : null;
-    const best = graded.slice().sort((a, b) => courseGrade(b).score - courseGrade(a).score)[0];
+    // 成绩构成估算：和课程成绩页同一套算法，主分数仍用 Canvas 官方成绩
+    const estimates = new Map();
+    await Promise.all(courses.map(async (c) => {
+      try {
+        const groups = await cached(`groups:${c.id}`, 300000, () => API.assignmentGroups(c.id), force);
+        const r = window.CanvasGrades.computeCourseGrade(groups, { weighted: !!c.apply_assignment_group_weights });
+        if (r && r.current != null) estimates.set(String(c.id), r.current);
+      } catch (e) { /* 拿不到作业分组就不显示估算 */ }
+    }));
+    if (stale(seq)) return;
+
+    // 主分数：Canvas 官方分优先，没有官方分时用构成估算补位
+    const effective = new Map();
+    courses.forEach((c) => {
+      const official = courseGrade(c).score;
+      const est = estimates.has(String(c.id)) ? estimates.get(String(c.id)) : null;
+      effective.set(String(c.id), { score: official != null ? official : est, official, est });
+    });
+    const graded = courses.filter((c) => effective.get(String(c.id)).score != null);
+    const avg = graded.length ? graded.reduce((s, c) => s + effective.get(String(c.id)).score, 0) / graded.length : null;
+    const best = graded.slice().sort((a, b) => effective.get(String(b.id)).score - effective.get(String(a.id)).score)[0];
+    const estimatedCount = graded.filter((c) => effective.get(String(c.id)).official == null).length;
 
     // 最近出分：用已经缓存的各课作业数据，不额外发请求
     const recent = [];
@@ -1964,23 +1984,31 @@
         ${!courses.length ? emptyState('chart', '还没有课程', '') : `
         <div class="grade-overview">
           <div class="card grade-hero">
-            <div><p class="muted">平均分（已出分课程）</p><p class="big-score">${avg != null ? avg.toFixed(1) + '<small>%</small>' : '—'}</p></div>
-            ${best ? `<div class="gh-side"><p>最高</p><p><b>${esc(courseCode(best))}</b> · ${esc(formatScore(courseGrade(best).score))}%</p></div>` : ''}
+            <div><p class="muted">平均分${estimatedCount ? '（含构成估算）' : '（已出分课程）'}</p><p class="big-score">${avg != null ? avg.toFixed(1) + '<small>%</small>' : '—'}</p></div>
+            ${best ? `<div class="gh-side"><p>最高</p><p><b>${esc(courseCode(best))}</b> · ${esc(formatScore(effective.get(String(best.id)).score))}%</p></div>` : ''}
           </div>
           <div class="card list grade-courses">
             ${courses.map((c) => {
               const g = courseGrade(c);
+              const e = effective.get(String(c.id));
+              const score = e.score;
+              const showsEstimate = e.official == null && e.est != null;
               return `<a class="row grade-row" href="#/course/${c.id}?tab=grades" style="--c:${courseColor(c)}">
                 <span class="dot" style="--c:${courseColor(c)}"></span>
                 <span class="row-main">
                   <span class="row-title">${esc(splitCourseTitle(c).name)}</span>
-                  <span class="bar"><span style="width:${g.score != null ? Math.max(2, Math.min(100, g.score)) : 0}%"></span></span>
-                  <span class="row-meta"><span>${esc(courseCode(c))}</span>${g.grade ? `<span>${esc(g.grade)}</span>` : ''}</span>
+                  <span class="bar"><span style="width:${score != null ? Math.max(2, Math.min(100, score)) : 0}%"></span></span>
+                  <span class="row-meta">
+                    <span>${esc(courseCode(c))}</span>
+                    ${g.grade ? `<span>${esc(g.grade)}</span>` : ''}
+                    ${showsEstimate ? '<span>Canvas 暂无分数 · 按构成估算</span>' : (e.est != null ? `<span>构成估算 ${esc(fmtPct(e.est))}%</span>` : '')}
+                  </span>
                 </span>
-                <span class="gr-num"><b>${g.score != null ? esc(formatScore(g.score)) : '—'}</b>${g.score != null ? '<small>%</small>' : ''}</span>
+                <span class="gr-num">${showsEstimate ? '<em class="est-tag">估算</em>' : ''}<b>${score != null ? esc(formatScore(score)) : '—'}</b>${score != null ? '<small>%</small>' : ''}</span>
               </a>`;
             }).join('')}
           </div>
+          <p class="page-foot">主分数优先用 Canvas 官方成绩；官方没有分数时用「构成估算」补位（按作业分组权重与已评分作业计算）。</p>
         </div>
         ${recent.length ? `<section class="section">
           <div class="section-head"><h2>最近出分</h2></div>

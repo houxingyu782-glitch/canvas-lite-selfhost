@@ -1052,3 +1052,5 @@ html.is-offline .page-header h1::after {
   border-radius: 8px; background: var(--warn-soft); color: var(--warn);
   font-size: 12px; font-weight: 700; letter-spacing: 0;
 }
+
+.est-tag { font-style: normal; font-size: 10px; color: var(--muted); background: var(--surface-2); border-radius: 5px; padding: 1px 4px; margin-right: 4px; vertical-align: 1px; }
