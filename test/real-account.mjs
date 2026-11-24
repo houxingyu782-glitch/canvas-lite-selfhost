@@ -190,6 +190,20 @@ async function main() {
   await go(page, '#/me');
   await page.waitForSelector('.profile-card', { timeout: 20000 });
   record('设置页', true, (await page.textContent('.profile-name')).trim());
+
+  // 日历订阅：真实账号的 profile 里应当带 calendar.ics。
+  // 这个地址等于日历的钥匙，只判断有没有、不打印内容。
+  const meText = await page.textContent('#app');
+  const hasFeed = /feeds\/calendars\/\S+\.ics/.test(meText);
+  if (hasFeed) {
+    const webcalHref = await page.$$eval('a[href^="webcal://"]', (els) => els[0]?.getAttribute('href') || '').catch(() => '');
+    const copyBtn = await page.$$eval('button[data-action="copy-ics"]', (els) => els.length).catch(() => 0);
+    record('日历订阅', webcalHref.startsWith('webcal://') && copyBtn === 1,
+      `${webcalHref ? 'webcal 链接正常' : '缺 webcal 链接'} / ${copyBtn ? '复制按钮正常' : '缺复制按钮'}`);
+  } else {
+    record('日历订阅', true, '这个账号没有返回 calendar.ics，页面降级成「学校没有提供」（正常）');
+  }
+
   await page.click('button[data-value="dark"]');
   await page.waitForTimeout(300);
   record('深色模式', (await page.getAttribute('html', 'data-theme')) === 'dark');
