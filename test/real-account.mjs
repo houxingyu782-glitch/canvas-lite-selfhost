@@ -1,10 +1,11 @@
 /**
- * 真实账号全功能巡检
+ * 真实账号功能巡检
  *
  * 只读：只打开页面、读取数据，不提交、不修改任何东西。
  *
  * 用法（令牌只放在环境变量里，不落盘）：
- *   CANVAS_TOKEN='xxxx' CANVAS_BASE='https://canvas.example.edu' node test/real-account.mjs
+ *   CANVAS_TOKEN='xxxx' node test/real-account.mjs           # 快速模式，约 1 分钟，抽查首尾两门课
+ *   CANVAS_TOKEN='xxxx' node test/real-account.mjs --full    # 逐门课 × 全部栏目，十几分钟
  *
  * 前提：本地服务已在 http://127.0.0.1:8787 运行（npm start）。
  * 登录页已经预填学校地址时（CANVAS_HOST 启动或 Pages 设了 CANVAS_ORIGIN）可以不传 CANVAS_BASE。
@@ -17,6 +18,9 @@ const APP = process.env.APP_URL || 'http://127.0.0.1:8787';
 const TOKEN = process.env.CANVAS_TOKEN || '';
 const BASE = process.env.CANVAS_BASE || '';
 const SHOTS = '/tmp/real-account-shots';
+// 默认只抽查首尾两门课：每次发版都跑，得够快。要逐门查就加 --full。
+const FULL = process.argv.includes('--full');
+const startedAt = Date.now();
 
 if (!TOKEN) {
   console.error('缺少 CANVAS_TOKEN');
@@ -99,7 +103,10 @@ async function main() {
   record('成绩总览', true, (await page.textContent('.grade-courses')).replace(/\s+/g, ' ').slice(0, 60));
 
   // 逐个课程巡检全部栏目
-  const ids = Array.from(new Set(await page.$$eval('.grade-courses a', (els) => els.map((a) => a.getAttribute('href').match(/\d+/)[0]))));
+  const allIds = Array.from(new Set(await page.$$eval('.grade-courses a', (els) => els.map((a) => a.getAttribute('href').match(/\d+/)[0]))));
+  // 快速模式只查首尾两门课，--full 才逐门查
+  const ids = FULL || allIds.length <= 2 ? allIds : [allIds[0], allIds[allIds.length - 1]];
+  console.log(`（${FULL ? '完整模式' : '快速模式'}：${ids.length}/${allIds.length} 门课程 × 五个栏目；加 --full 可逐门全查）`);
   let moduleCourse = null;
   for (const id of ids) {
     for (const tab of ['overview', 'assignments', 'modules', 'announcements', 'grades']) {
@@ -245,7 +252,7 @@ async function main() {
   await browser.close();
 
   const failed = results.filter((r) => !r.ok);
-  console.log(`\n共 ${results.length} 项，失败 ${failed.length} 项`);
+  console.log(`\n共 ${results.length} 项，失败 ${failed.length} 项，用时 ${((Date.now() - startedAt) / 1000).toFixed(1)} 秒`);
   if (failed.length) {
     console.log('失败项：' + failed.map((f) => f.name).join('、'));
     process.exitCode = 1;
