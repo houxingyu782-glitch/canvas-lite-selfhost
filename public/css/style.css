@@ -805,14 +805,17 @@ label.setting-row { cursor: pointer; }
 .setting-value { display: inline-flex; align-items: center; gap: 6px; color: var(--muted); font-size: 14px; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 .setting-value .ico { width: 16px; height: 16px; }
 .mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 13px; }
+.setting-value.is-url { display: block; white-space: nowrap; text-overflow: ellipsis; }
 .help-row { border-top: 1px solid var(--border); }
 .list > .help-row:first-child { border-top: 0; }
 .help-row summary { padding: 14px 16px; cursor: pointer; font-weight: 500; }
 .help-row summary:hover { background: var(--hover); }
 .help-body { padding: 0 16px 14px; color: var(--text-2); font-size: 14px; }
 .page-me .btn-danger { margin-top: 24px; }
+.setting-hint { margin: 8px 4px 0; color: var(--muted); font-size: 13px; line-height: 1.6; }
 @media (max-width: 520px) {
   .setting-row:has(.seg) { flex-direction: column; align-items: flex-start; }
+  .setting-row.is-url { flex-direction: column; align-items: stretch; gap: 4px; }
 }
 
 /* ============================ 详情面板 ============================ */

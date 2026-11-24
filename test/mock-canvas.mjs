@@ -299,14 +299,18 @@ const server = http.createServer((req, res) => {
   }
 
   if (path === '/api/v1/users/self/profile') {
-    json(res, 200, {
+    const profile = {
       id: 42,
       name: 'Alex Chen',
       short_name: 'Alex',
       login_id: 'alex.chen@example.edu',
       email: 'alex.chen@example.edu',
       avatar_url: null,
-    });
+      // 只有本人访问自己的 profile 才带这个字段
+      calendar: { ics: 'https://canvas.example.edu/feeds/calendars/user_demo1234.ics' },
+    };
+    if (process.env.MOCK_NO_CALENDAR === '1') delete profile.calendar;
+    json(res, 200, profile);
     return;
   }
 

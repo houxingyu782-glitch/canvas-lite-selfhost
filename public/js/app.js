@@ -12,7 +12,7 @@
 
   const API = window.CanvasAPI;
   const config = API.loadConfig();
-  const VERSION = '2.2.0';
+  const VERSION = '2.3.0';
 
   const root = document.documentElement;
   const app = document.getElementById('app');
@@ -445,6 +445,32 @@
     toastEl.className = `toast show${tone ? ' toast-' + tone : ''}`;
     clearTimeout(toast.timer);
     toast.timer = setTimeout(() => { toastEl.className = 'toast'; }, 2600);
+  }
+
+  // 复制到剪贴板：优先用 Clipboard API，失败时退回旧的 execCommand（非 https 或没有权限时）
+  async function copyText(text) {
+    if (!text) return false;
+    try {
+      if (navigator.clipboard && window.isSecureContext) {
+        await navigator.clipboard.writeText(text);
+        return true;
+      }
+    } catch (e) { /* 没权限就往后退 */ }
+    try {
+      const area = document.createElement('textarea');
+      area.value = text;
+      area.setAttribute('readonly', '');
+      area.style.position = 'fixed';
+      area.style.top = '-1000px';
+      area.style.opacity = '0';
+      document.body.appendChild(area);
+      area.select();
+      const done = document.execCommand('copy');
+      area.remove();
+      return done;
+    } catch (e) {
+      return false;
+    }
   }
 
   async function downloadCanvasFile(fileId, name, fallback) {
@@ -2068,6 +2094,17 @@
 
   /* ============================ 页面：设置 ============================ */
 
+  // Canvas 只在自己的 profile 里给出日历订阅地址：/feeds/calendars/user_xxxx.ics
+  function calendarFeedUrl(profile) {
+    const ics = profile && profile.calendar && profile.calendar.ics;
+    return typeof ics === 'string' && /^https?:\/\//i.test(ics.trim()) ? ics.trim() : '';
+  }
+
+  // 手机点 webcal:// 会直接打开系统日历去订阅，不用自己粘贴网址
+  function webcalUrl(url) {
+    return String(url || '').replace(/^https?:\/\//i, 'webcal://');
+  }
+
   async function meView({ seq }) {
     const res = await settle(ensureProfile(false));
     if (stale(seq)) return;
@@ -2075,6 +2112,7 @@
     const profile = res.ok ? res.data : state.profile;
     const local = API.isLocalServer();
     const theme = config.theme || 'auto';
+    const feed = calendarFeedUrl(profile);
 
     app.innerHTML = `
       <div class="page page-me">
@@ -2108,6 +2146,30 @@
               <span class="setting-label">强制更新到最新版</span><span class="setting-value">v${VERSION} ${icon('refresh')}</span>
             </button>
           </div>
+        </section>
+
+        <section class="section">
+          <div class="section-head"><h2>日历订阅</h2></div>
+          <div class="card list">
+            ${feed ? `
+            <div class="setting-row is-url">
+              <span class="setting-label">订阅地址</span>
+              <span class="setting-value mono is-url" title="${esc(feed)}">${esc(feed)}</span>
+            </div>
+            <button class="setting-row as-button" data-action="copy-ics" type="button">
+              <span class="setting-label">复制订阅链接</span><span class="setting-value">${icon('file')} 复制</span>
+            </button>
+            <a class="setting-row as-button" href="${esc(webcalUrl(feed))}" rel="noopener">
+              <span class="setting-label">在手机日历里订阅</span><span class="setting-value">${icon('event')} 打开</span>
+            </a>
+            ` : `
+            <div class="setting-row">
+              <span class="setting-label">日历订阅</span>
+              <span class="setting-value">学校没有提供</span>
+            </div>
+            `}
+          </div>
+          ${feed ? `<p class="setting-hint">把作业截止时间同步到手机或电脑的日历，只读，Canvas 改了会自动跟着变。这个链接等于你日历的钥匙，别发给别人。</p>` : ''}
         </section>
 
         <section class="section">
@@ -2600,6 +2662,17 @@
         applyTheme();
         updateChrome();
         toast({ auto: '外观：跟随系统', light: '外观：浅色', dark: '外观：深色' }[next]);
+        return;
+      }
+      case 'copy-ics': {
+        event.preventDefault();
+        const feed = calendarFeedUrl(state.profile);
+        if (!feed) {
+          toast('没有拿到日历订阅地址');
+          return;
+        }
+        const done = await copyText(feed);
+        toast(done ? '订阅链接已复制' : '复制失败，长按上面的地址手动复制', done ? 'ok' : 'danger');
         return;
       }
       case 'mark-all-read': {

@@ -304,6 +304,12 @@ async function main() {
   body = await page.textContent('#app');
   ok(body.includes('alex.chen@example.edu'), '显示账号信息');
   ok(body.includes('本机代理'), '显示本地代理连接方式');
+  ok(body.includes('feeds/calendars/user_demo1234.ics'), '设置页显示日历订阅地址');
+  const webcalHref = await page.getAttribute('a[href^="webcal://"]', 'href');
+  ok(webcalHref === 'webcal://canvas.example.edu/feeds/calendars/user_demo1234.ics', '日历订阅链接转成 webcal 可点击');
+  await page.click('[data-action="copy-ics"]');
+  await page.waitForSelector('.toast.show', { timeout: 5000 });
+  ok((await page.textContent('.toast')).includes('订阅链接'), '复制订阅链接后有提示');
   await page.click('[data-action="theme"][data-value="dark"]');
   ok((await page.getAttribute('html', 'data-theme')) === 'dark', '切换到深色模式');
   await page.goto(`${APP}/#/home`);
@@ -374,7 +380,7 @@ async function main() {
   const MOCK2_PORT = 9912;
   const APP2_PORT = 8788;
   const BASE2 = `http://127.0.0.1:${MOCK2_PORT}`;
-  start(process.execPath, ['test/mock-canvas.mjs', String(MOCK2_PORT)], { MOCK_NO_PLANNER: '1' }, 'mock-off');
+  start(process.execPath, ['test/mock-canvas.mjs', String(MOCK2_PORT)], { MOCK_NO_PLANNER: '1', MOCK_NO_CALENDAR: '1' }, 'mock-off');
   start(process.execPath, ['server/server.mjs'], { PORT: String(APP2_PORT), ALLOW_INSECURE_LOCAL: '1' }, 'server2');
   const up2 = (await waitFor(`${BASE2}/healthz`)) && (await waitFor(`http://127.0.0.1:${APP2_PORT}/healthz`));
   if (!up2) throw new Error('降级测试服务没起来');
@@ -388,6 +394,10 @@ async function main() {
   const offBody = await pageOff.textContent('#app');
   ok(offBody.includes('Problem Set 4'), 'Planner 关闭时仍显示待办');
   ok(!offBody.includes('没能刷新') && !offBody.includes('出了点问题'), 'Planner 关闭时不显示错误提示');
+  await pageOff.goto(`http://127.0.0.1:${APP2_PORT}/#/me`);
+  await pageOff.waitForSelector('.profile-card', { timeout: 8000 });
+  const meOff = await pageOff.textContent('#app');
+  ok(meOff.includes('学校没有提供') && !meOff.includes('feeds/calendars'), '学校没开日历订阅时给出说明');
   await ctxOff.close();
 
   const realErrors = consoleErrors.filter((text) => !/favicon|Failed to load resource/i.test(text));
