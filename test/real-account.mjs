@@ -13,11 +13,13 @@
  */
 import { chromium } from 'playwright';
 import fs from 'node:fs/promises';
+import os from 'node:os';
+import path from 'node:path';
 
 const APP = process.env.APP_URL || 'http://127.0.0.1:8787';
 const TOKEN = process.env.CANVAS_TOKEN || '';
 const BASE = process.env.CANVAS_BASE || '';
-const SHOTS = '/tmp/real-account-shots';
+const SHOTS = path.join(os.tmpdir(), 'real-account-shots');
 // 默认只抽查首尾两门课：每次发版都跑，得够快。要逐门查就加 --full。
 const FULL = process.argv.includes('--full');
 const startedAt = Date.now();

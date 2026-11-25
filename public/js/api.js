@@ -208,7 +208,7 @@
   }
 
   async function getAll(path, options = {}) {
-    const { maxPages = 8, perPage = 100, query = {} } = options;
+    const { maxPages = 8, perPage = 100, query = {}, signal } = options;
     let next = path;
     let pages = 0;
     const collected = [];
@@ -227,6 +227,7 @@
       }
       const res = await request(pagePath, {
         query: pages === 0 ? { per_page: perPage, ...query } : undefined,
+        signal,
       });
       if (Array.isArray(res.data)) collected.push(...res.data);
       else if (res.data) return res.data;
@@ -277,6 +278,7 @@
     assignments: (courseId, signal) =>
       getAll(`/api/v1/courses/${courseId}/assignments`, {
         query: { 'include[]': 'submission', order_by: 'due_at' },
+        signal,
       }),
 
     // 作业分组：含每组权重、去分规则、组内作业和自己的提交得分，用来算每项占比
@@ -324,9 +326,9 @@
       request(`/api/v1/courses/${courseId}/tabs`).then((res) => (Array.isArray(res.data) ? res.data : [])),
 
     modules: (courseId) =>
-      request(`/api/v1/courses/${courseId}/modules`, {
-        query: { 'include[]': 'items', per_page: 100 },
-      }).then((res) => res.data),
+      getAll(`/api/v1/courses/${courseId}/modules`, {
+        query: { 'include[]': 'items' },
+      }),
   };
 
   global.CanvasAPI = api;

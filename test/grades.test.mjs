@@ -64,10 +64,11 @@ test('excused, omitted and zero-point items do not count; extra credit adds to t
       a(3, 10, 0, { omit_from_final_grade: true }),
       a(4, 0, null),
       a(5, 0, 2),
+      a(6, 0, 0),
     ],
   }], { weighted: true });
   const states = r.groups[0].items.map((x) => x.state);
-  assert.deepEqual(states, ['graded', 'excused', 'excluded', 'excluded', 'graded']);
+  assert.deepEqual(states, ['graded', 'excused', 'excluded', 'excluded', 'graded', 'excluded']);
   near(r.current, 80, '(6 + 2 加分) / 10');
   near(r.earned, 80, '已锁定 80');
   near(r.remaining, 0, '没有剩余');
