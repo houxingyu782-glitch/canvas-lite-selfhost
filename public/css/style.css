@@ -737,8 +737,8 @@ html.panel-dock .course-grid { grid-template-columns: 1fr; }
 .gh-side { text-align: right; color: var(--muted); font-size: 14px; }
 .gh-side b { color: var(--text); }
 .grade-row { align-items: center; }
-.grade-row .bar { display: block; height: 6px; margin: 4px 0 2px; border-radius: 3px; background: var(--surface-3); overflow: hidden; }
-.grade-row .bar > span { display: block; height: 100%; border-radius: 3px; background: var(--c, var(--accent)); }
+.bar { display: block; height: 6px; margin: 4px 0 2px; border-radius: 3px; background: var(--surface-3); overflow: hidden; }
+.bar > span { display: block; height: 100%; border-radius: 3px; background: var(--c, var(--accent)); }
 .gr-num { flex: none; min-width: 64px; text-align: right; font-variant-numeric: tabular-nums; }
 .gr-num b { font-size: 18px; font-weight: 750; }
 .gr-num small { color: var(--muted); font-size: 12px; margin-left: 2px; }
@@ -901,6 +901,41 @@ html.panel-dock .gc-top .gh-side { display: flex; flex-wrap: wrap; gap: 4px 14px
 .facts dd { margin: 0; font-weight: 500; font-size: 14.5px; }
 .facts dd small { margin-left: 8px; color: var(--muted); font-weight: 400; font-size: 13px; }
 .attach-list { margin-bottom: 18px; }
+
+.detail-section { margin: 18px 0; }
+.detail-section-head { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; margin: 0 2px 8px; }
+.detail-section-head h2 { font-size: 15px; font-weight: 700; }
+.detail-section-meta { font-size: 13px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.detail-section-meta b { color: var(--text); }
+
+.rubric-row { display: grid; gap: 6px; padding: 12px 14px; border-top: 1px solid var(--border); }
+.rubric-list > .rubric-row:first-child { border-top: 0; }
+.rubric-top { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
+.rubric-title { font-weight: 600; font-size: 14.5px; line-height: 1.35; }
+.rubric-score { flex: none; font-variant-numeric: tabular-nums; font-size: 14px; }
+.rubric-score b { font-size: 16px; font-weight: 750; }
+.rubric-score small { color: var(--muted); font-size: 12.5px; }
+.rubric-bar { margin: 2px 0; height: 5px; }
+.rubric-sub { display: grid; justify-items: start; gap: 5px; }
+.rubric-sub .chip { height: 22px; font-size: 11.5px; }
+.rubric-comment { font-size: 13.5px; color: var(--text-2); line-height: 1.5; white-space: pre-line; }
+.rubric-desc { font-size: 13px; color: var(--muted); line-height: 1.45; }
+
+.comment-item { display: grid; gap: 6px; padding: 12px 14px; border-top: 1px solid var(--border); }
+.comment-list > .comment-item:first-child { border-top: 0; }
+.comment-head { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
+.comment-author { font-size: 13.5px; font-weight: 700; color: var(--text); }
+.comment-time { font-size: 12px; color: var(--muted); }
+.comment-body { font-size: 14px; line-height: 1.6; color: var(--text-2); white-space: pre-line; overflow-wrap: anywhere; }
+.comment-atts { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 2px; }
+.comment-att {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 5px 10px; border-radius: 8px;
+  background: var(--surface-2); border: 1px solid var(--border);
+  font-size: 12.5px; font-weight: 500; color: var(--text-2);
+}
+.comment-att:hover { background: var(--hover); border-color: var(--border-strong); color: var(--text); }
+.comment-att .ico { width: 14px; height: 14px; color: var(--muted); }
 
 .detail-desc { margin-top: 18px; }
 .panel-cta { margin-top: 28px; }

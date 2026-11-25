@@ -100,7 +100,44 @@ const assignments101 = [
     points_possible: 20,
     submission_types: ['online_text_entry'],
     html_url: '/courses/101/assignments/5003',
-    submission: submission({ id: 9003, workflow_state: 'graded', submitted_at: iso(-6, 9), score: 18, grade: '90%' }),
+    rubric: [
+      {
+        id: 'r1',
+        description: '核心观点提炼',
+        points: 10,
+        ratings: [
+          { id: 'r1_full', description: '准确深刻', points: 10 },
+          { id: 'r1_mid', description: '基本到位', points: 8 },
+        ],
+      },
+      {
+        id: 'r2',
+        description: '例子与表达',
+        points: 10,
+        ratings: [
+          { id: 'r2_full', description: '清晰流畅', points: 10 },
+        ],
+      },
+    ],
+    submission: submission({
+      id: 9003,
+      workflow_state: 'graded',
+      submitted_at: iso(-6, 9),
+      score: 18,
+      grade: '90%',
+      submission_comments: [
+        {
+          id: 8101,
+          author_name: 'TA Grace',
+          comment: '结合第 3 章函数短小原则举的例子很好。<img src=x onerror=alert(1)>',
+          created_at: iso(-5, 14, 20),
+        },
+      ],
+      rubric_assessment: {
+        r1: { points: 8, rating_id: 'r1_mid', comments: '可以再展开对比一下命名规范' },
+        r2: { points: 10, rating_id: 'r2_full', comments: '' },
+      },
+    }),
   },
   {
     id: 5004,
@@ -353,7 +390,13 @@ const server = http.createServer((req, res) => {
       json(res, 404, { errors: [{ message: 'not found' }] });
       return;
     }
-    json(res, 200, found);
+    const includes = new Set(url.searchParams.getAll('include[]'));
+    const copy = { ...found, submission: found.submission ? { ...found.submission } : undefined };
+    if (copy.submission) {
+      if (!includes.has('submission_comments')) delete copy.submission.submission_comments;
+      if (!includes.has('rubric_assessment')) delete copy.submission.rubric_assessment;
+    }
+    json(res, 200, copy);
     return;
   }
 

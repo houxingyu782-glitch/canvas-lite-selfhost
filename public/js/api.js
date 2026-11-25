@@ -290,7 +290,7 @@
 
     assignment: (courseId, assignmentId) =>
       request(`/api/v1/courses/${courseId}/assignments/${assignmentId}`, {
-        query: { 'include[]': 'submission' },
+        query: { 'include[]': ['submission', 'submission_comments', 'rubric_assessment'] },
       }).then((res) => res.data),
 
     // 公告只取最近一页：之前跟着 Link 翻 8 页，一门课要 10 秒
