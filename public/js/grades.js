@@ -71,7 +71,7 @@
         };
       });
       items.forEach((x) => {
-        if (x.state !== 'excluded' && x.state !== 'excused' && x.possible <= 0 && x.score == null) x.state = 'excluded';
+        if (x.state !== 'excluded' && x.state !== 'excused' && x.possible <= 0 && (x.score == null || x.score <= 0)) x.state = 'excluded';
       });
       applyDrops(items, g.rules);
       const counting = items.filter((x) => x.state === 'graded' || x.state === 'pending');

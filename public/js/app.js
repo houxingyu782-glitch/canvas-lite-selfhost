@@ -12,7 +12,7 @@
 
   const API = window.CanvasAPI;
   const config = API.loadConfig();
-  const VERSION = '2.3.0';
+  const VERSION = '2.3.1';
 
   const root = document.documentElement;
   const app = document.getElementById('app');
@@ -111,6 +111,7 @@
     file: '<path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/>',
     page: '<path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5M9 13h6M9 17h4"/>',
     download: '<path d="M12 3v12"/><path d="m7 10 5 5 5-5"/><path d="M4 21h16"/>',
+    link: '<path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>',
     external: '<path d="M14 4h6v6"/><path d="M20 4 10 14"/><path d="M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"/>',
     eye: '<path d="M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6S2 12 2 12Z"/><circle cx="12" cy="12" r="2.5"/>',
     swap: '<path d="M7 4 3 8l4 4"/><path d="M3 8h13a5 5 0 0 1 0 10h-2"/>',
@@ -199,6 +200,32 @@
   function pointsText(points) {
     if (points == null) return '不计分';
     return `${Number(points) % 1 === 0 ? Number(points) : Number(points).toFixed(1)} 分`;
+  }
+
+  function formatFileMeta(file) {
+    if (!file) return '';
+    const mime = String(file.content_type || '').toLowerCase();
+    const name = String(file.filename || file.display_name || '').toLowerCase();
+    const ext = (name.match(/\.([a-z0-9]{1,8})$/) || [])[1] || '';
+    let kind = '';
+    if (mime === 'application/pdf' || ext === 'pdf') kind = 'PDF 文档';
+    else if (mime.includes('zip') || mime.includes('compressed') || /^(zip|rar|7z|tar|gz)$/.test(ext)) kind = '压缩包';
+    else if (mime.includes('wordprocessingml') || mime === 'application/msword' || /^(doc|docx)$/.test(ext)) kind = 'Word 文档';
+    else if (mime.includes('presentationml') || mime.includes('powerpoint') || /^(ppt|pptx)$/.test(ext)) kind = 'PPT 演示文稿';
+    else if (mime.includes('spreadsheetml') || mime.includes('excel') || /^(xls|xlsx|csv)$/.test(ext)) kind = '表格文件';
+    else if (mime.startsWith('image/') || /^(png|jpe?g|gif|webp|svg)$/.test(ext)) kind = '图片';
+    else if (mime.startsWith('video/')) kind = '视频';
+    else if (mime.startsWith('audio/')) kind = '音频';
+    else if (mime.startsWith('text/') || /^(txt|md|py|js|java|c|cpp|json)$/.test(ext)) kind = ext ? `${ext.toUpperCase()} 文件` : '文本文件';
+    else if (ext) kind = `${ext.toUpperCase()} 文件`;
+    else kind = file.content_type || '';
+    const size = Number(file.size);
+    let sizeText = '';
+    if (Number.isFinite(size) && size > 0) {
+      sizeText = size >= 1024 * 1024 ? `${(size / (1024 * 1024)).toFixed(1)} MB`
+        : size >= 1024 ? `${Math.round(size / 1024)} KB` : `${size} B`;
+    }
+    return [kind, sizeText].filter(Boolean).join(' · ');
   }
 
   /* ---------- 时间 ---------- */
@@ -499,10 +526,11 @@
 
   const memCache = new Map();
   const CACHE_KEY = 'canvas-lite.cache.v3';
-  const CACHE_LIMIT = 3 * 1024 * 1024;
+  const CACHE_LIMIT = 1800000;
   const refreshing = new Set();
   const inflight = new Map();
   let persistTimer = null;
+  let prefetchRunning = false;
 
   // 启动时恢复上次的数据：先秒开，再在后台悄悄更新
   (function hydrateCache() {
@@ -515,24 +543,31 @@
     } catch (e) { /* 缓存损坏就忽略 */ }
   })();
 
+  function serializeCache(limit) {
+    const entries = Array.from(memCache.entries()).sort((a, b) => b[1].at - a[1].at);
+    const out = {};
+    let size = 0;
+    for (const [key, value] of entries) {
+      const json = JSON.stringify(value);
+      if (size + json.length > limit) continue;
+      out[key] = value;
+      size += json.length;
+    }
+    return JSON.stringify(out);
+  }
+
   function persistCacheSoon() {
     if (persistTimer) return;
     persistTimer = setTimeout(() => {
       persistTimer = null;
-      try {
-        const entries = Array.from(memCache.entries()).sort((a, b) => b[1].at - a[1].at);
-        const out = {};
-        let size = 0;
-        for (const [key, value] of entries) {
-          const json = JSON.stringify(value);
-          if (size + json.length > CACHE_LIMIT) continue;
-          out[key] = value;
-          size += json.length;
-        }
-        localStorage.setItem(CACHE_KEY, JSON.stringify(out));
-      } catch (e) {
-        try { localStorage.removeItem(CACHE_KEY); } catch (err) { /* ignore */ }
+      // 若浏览器 localStorage 配额吃紧，逐步减半淘汰最旧缓存，避免整份清空
+      for (const limit of [CACHE_LIMIT, Math.floor(CACHE_LIMIT / 2), Math.floor(CACHE_LIMIT / 4)]) {
+        try {
+          localStorage.setItem(CACHE_KEY, serializeCache(limit));
+          return;
+        } catch (e) { /* 尝试更小上限 */ }
       }
+      try { localStorage.removeItem(CACHE_KEY); } catch (err) { /* ignore */ }
     }, 400);
   }
 
@@ -583,8 +618,10 @@
       const before = JSON.stringify(peek(key));
       try {
         const data = await fetchInto(key, loader);
-        // 后台拿到新数据：底层页面正在用这份数据就原位重绘（保持滚动位置）
-        if (JSON.stringify(data) !== before && state.usedKeys.has(key) && !palette.classList.contains('open')) {
+        const activeEl = document.activeElement;
+        const typingInApp = activeEl && app.contains(activeEl) && /^(INPUT|TEXTAREA|SELECT)$/.test(activeEl.tagName);
+        // 后台拿到新数据：底层页面正在用这份数据就原位重绘（不打断用户输入）
+        if (JSON.stringify(data) !== before && state.usedKeys.has(key) && !palette.classList.contains('open') && !typingInApp) {
           if (key === 'courses') state.courses = sortCourses(data);
           rerenderBase();
         }
@@ -603,22 +640,40 @@
   }
 
   function prefetchCourses(courses) {
-    if (!courses || !courses.length) return;
+    if (!courses || !courses.length || prefetchRunning) return;
     const conn = navigator.connection || {};
     if (conn.saveData) return;
     const slow = /(^|-)2g$|(^|-)3g$/.test(conn.effectiveType || '');
     const list = courses.slice(0, slow ? 2 : courses.length);
+    prefetchRunning = true;
     // 一次只预取一个，避免把连接池占满、拖慢你正在看的页面
     const run = async () => {
-      for (let i = 0; i < list.length; i += 1) {
-        const course = list[i];
-        await prefetchKey(`assignments:${course.id}`, () => API.assignments(course.id));
-        if (i < 3) await prefetchKey(`modules:${course.id}`, () => API.modules(course.id));
-        if (i < 4) await prefetchKey(`groups:${course.id}`, () => API.assignmentGroups(course.id));
+      try {
+        for (let i = 0; i < list.length; i += 1) {
+          const course = list[i];
+          await prefetchKey(`assignments:${course.id}`, () => API.assignments(course.id));
+          if (i < 3) await prefetchKey(`modules:${course.id}`, () => API.modules(course.id));
+          if (i < 4) await prefetchKey(`groups:${course.id}`, () => API.assignmentGroups(course.id));
+        }
+      } finally {
+        prefetchRunning = false;
       }
     };
     if (window.requestIdleCallback) window.requestIdleCallback(run, { timeout: 3000 });
     else setTimeout(run, 1000);
+  }
+
+  async function mapLimit(items, limit, fn) {
+    const out = new Array(items.length);
+    let next = 0;
+    const workers = Array.from({ length: Math.min(limit, items.length) }, async () => {
+      while (next < items.length) {
+        const i = next++;
+        out[i] = await fn(items[i], i);
+      }
+    });
+    await Promise.all(workers);
+    return out;
   }
 
   async function settle(promise) {
@@ -1527,37 +1582,40 @@
     const grade = courseGrade(course);
     const teacher = (course.teachers || [])[0];
 
-    app.innerHTML = `
-      <div class="page course-page" style="--c:${color}">
-        <header class="course-head">
-          <div class="ch-bar">
-            <button class="icon-btn" data-action="back" data-fallback="#/courses" type="button" aria-label="返回" title="返回">${icon('left')}</button>
-            <button class="ch-switch" data-action="switch-course" type="button" aria-haspopup="dialog">
-              <span class="dot" style="--c:${color}"></span><span>${esc(courseCode(course) || '课程')}</span>${icon('down')}
-            </button>
-            <span class="ph-actions">
-              <button class="icon-btn" data-action="refresh" type="button" aria-label="刷新" title="刷新">${icon('refresh')}</button>
-              <a class="icon-btn" href="${esc(canvasHref(`/courses/${course.id}`))}" target="_blank" rel="noopener" aria-label="在 Canvas 中打开" title="在 Canvas 中打开">${icon('external')}</a>
-            </span>
-          </div>
-          <div class="ch-main">
-            <div class="ch-text">
-              <p class="ch-code">${esc(title.code || course.course_code || '')}</p>
-              <h1>${esc(title.name)}</h1>
-              <p class="ch-meta">${esc([teacher && teacher.display_name, course.term && course.term.name].filter(Boolean).join(' · '))}</p>
+    const existingCourseBody = keepScroll ? $(`#course-body[data-course-id="${course.id}"]`) : null;
+    if (!existingCourseBody) {
+      app.innerHTML = `
+        <div class="page course-page" style="--c:${color}">
+          <header class="course-head">
+            <div class="ch-bar">
+              <button class="icon-btn" data-action="back" data-fallback="#/courses" type="button" aria-label="返回" title="返回">${icon('left')}</button>
+              <button class="ch-switch" data-action="switch-course" type="button" aria-haspopup="dialog">
+                <span class="dot" style="--c:${color}"></span><span>${esc(courseCode(course) || '课程')}</span>${icon('down')}
+              </button>
+              <span class="ph-actions">
+                <button class="icon-btn" data-action="refresh" type="button" aria-label="刷新" title="刷新">${icon('refresh')}</button>
+                <a class="icon-btn" href="${esc(canvasHref(`/courses/${course.id}`))}" target="_blank" rel="noopener" aria-label="在 Canvas 中打开" title="在 Canvas 中打开">${icon('external')}</a>
+              </span>
             </div>
-            ${grade.score != null ? `<a class="ch-grade" href="#/course/${course.id}?tab=grades" data-replace-route>
-              <b>${esc(formatScore(grade.score))}<small>%</small></b><span>当前成绩${grade.grade ? ' · ' + esc(grade.grade) : ''}</span></a>` : ''}
-          </div>
-          <nav class="tabs" role="tablist" aria-label="课程栏目">
-            ${COURSE_TABS.map(([key, label]) => `<a role="tab" aria-selected="${tab === key}" data-replace-route class="${tab === key ? 'on' : ''}"
-              href="#/course/${course.id}${key === 'overview' ? '' : '?tab=' + key}">${label}</a>${key === 'modules' ? edSlotHtml(course) : ''}`).join('')}
-          </nav>
-        </header>
-        <div id="course-body" class="course-body">${keepScroll ? '' : skeleton('list')}</div>
-      </div>`;
+            <div class="ch-main">
+              <div class="ch-text">
+                <p class="ch-code">${esc(title.code || course.course_code || '')}</p>
+                <h1>${esc(title.name)}</h1>
+                <p class="ch-meta">${esc([teacher && teacher.display_name, course.term && course.term.name].filter(Boolean).join(' · '))}</p>
+              </div>
+              ${grade.score != null ? `<a class="ch-grade" href="#/course/${course.id}?tab=grades" data-replace-route>
+                <b>${esc(formatScore(grade.score))}<small>%</small></b><span>当前成绩${grade.grade ? ' · ' + esc(grade.grade) : ''}</span></a>` : ''}
+            </div>
+            <nav class="tabs" role="tablist" aria-label="课程栏目">
+              ${COURSE_TABS.map(([key, label]) => `<a role="tab" aria-selected="${tab === key}" data-replace-route class="${tab === key ? 'on' : ''}"
+                href="#/course/${course.id}${key === 'overview' ? '' : '?tab=' + key}">${label}</a>${key === 'modules' ? edSlotHtml(course) : ''}`).join('')}
+            </nav>
+          </header>
+          <div id="course-body" class="course-body" data-course-id="${esc(course.id)}">${skeleton('list')}</div>
+        </div>`;
 
-    fillEdSlot(course, seq, force);
+      fillEdSlot(course, seq, force);
+    }
     const body = $('#course-body');
     const load = (key, ttl, loader) => settle(cached(key, ttl, loader, force));
     let html;
@@ -1804,6 +1862,13 @@
       </details>`).join('')}</div>`;
   }
 
+  function extractPageSlug(item) {
+    if (item && item.page_url) return String(item.page_url);
+    const raw = String((item && item.url) || '').split('/pages/')[1] || '';
+    const clean = raw.split(/[?#]/)[0];
+    try { return decodeURIComponent(clean); } catch (e) { return clean; }
+  }
+
   function moduleItemRow(item, course) {
     const type = String(item.type || '').toLowerCase();
     const title = esc(item.title || '');
@@ -1821,7 +1886,7 @@
     // 文件：站内直接下载（拿 Canvas 的签名链接）
     if (type === 'file' && item.content_id) return fileButton(item.content_id, item.html_url);
     // 页面 / 作业：站内打开
-    const pageSlug = item.page_url || (item.url || '').split('/pages/')[1];
+    const pageSlug = extractPageSlug(item);
     if (type === 'page' && pageSlug && course) return pageLink(course.id, pageSlug);
     if (type === 'assignment' && item.content_id && course) {
       return `<a class="module-item" href="#/course/${course.id}/a/${esc(item.content_id)}?from=modules"${indent}>
@@ -1835,7 +1900,7 @@
     }
 
     const label = { assignment: '作业', quiz: '测验', file: '文件', page: '页面', discussion: '讨论', externaltool: '工具', externalurl: '链接' }[type] || '内容';
-    const ic = { quiz: 'quiz', discussion: 'chat', assignment: 'pen' }[type] || 'external';
+    const ic = { quiz: 'quiz', discussion: 'chat', assignment: 'pen', file: 'file', page: 'page', externalurl: 'link' }[type] || 'link';
     const href = item.external_url || (item.html_url ? canvasHref(item.html_url) : '');
     if (!href) return `<div class="module-item"${indent}><span class="mi-ico">${icon(ic)}</span><span class="mi-title">${title}</span><span class="mi-type">${label}</span></div>`;
     return `<a class="module-item" href="${esc(href)}" target="_blank" rel="noopener"${indent}>
@@ -1881,7 +1946,7 @@
         <div>
           <p class="muted">当前得分 <small>（只按已评分作业）</small></p>
           <p class="big-score">${r.current != null ? esc(fmtPct(r.current)) + '<small>%</small>' : '—'}</p>
-          ${canvas.score != null ? `<p class="muted gc-canvas">Canvas 显示 ${esc(formatScore(canvas.score))}%${canvas.grade ? ' · ' + esc(canvas.grade) : ''}${differs ? '（Canvas 可能还用了这里拿不到的规则，以 Canvas 为准）' : ''}</p>` : ''}
+          ${canvas.score != null ? `<p class="muted gc-canvas">Canvas 官方 ${esc(formatScore(canvas.score))}%${canvas.grade ? ' · ' + esc(canvas.grade) : ''}${differs ? '（含额外规则，以 Canvas 为准）' : ''}</p>` : ''}
         </div>
         <div class="gh-side">
           <p>${r.weighted ? '按分组加权' : '按分值合计'}</p>
@@ -1985,7 +2050,7 @@
     app.innerHTML = `
       <div class="page page-feed">
         ${pageHeader('公告', {
-          sub: res.ok ? `最近 45 天 · ${unread ? `<b class="t-accent">${unread} 条未读</b> · <button class="link-btn" data-action="mark-all-read" type="button">全部标为已读</button>` : '全部已读'}` : '',
+          sub: res.ok ? `<span id="feed-sub">最近 45 天 · ${unread ? `<b class="t-accent">${unread} 条未读</b>` : '全部已读'}</span>${unread ? ' <button class="btn btn-ghost btn-sm feed-read-btn" data-action="mark-all-read" type="button">全部标为已读</button>' : ''}` : '',
         })}
         <div class="chip-scroll" role="group" aria-label="按课程筛选">
           <a class="filter ${filter ? '' : 'on'}" href="#/feed" data-replace-route>全部<span>${all.length}</span></a>
@@ -2016,13 +2081,13 @@
 
     // 成绩构成估算：和课程成绩页同一套算法，主分数仍用 Canvas 官方成绩
     const estimates = new Map();
-    await Promise.all(courses.map(async (c) => {
+    await mapLimit(courses, 3, async (c) => {
       try {
         const groups = await cached(`groups:${c.id}`, 300000, () => API.assignmentGroups(c.id), force);
         const r = window.CanvasGrades.computeCourseGrade(groups, { weighted: !!c.apply_assignment_group_weights });
         if (r && r.current != null) estimates.set(String(c.id), r.current);
       } catch (e) { /* 拿不到作业分组就不显示估算 */ }
-    }));
+    });
     if (stale(seq)) return;
 
     // 主分数：Canvas 官方分优先，没有官方分时用构成估算补位
@@ -2076,8 +2141,8 @@
               </a>`;
             }).join('')}
           </div>
-          <p class="page-foot">主分数优先用 Canvas 官方成绩；官方没有分数时用「构成估算」补位（按作业分组权重与已评分作业计算）。</p>
         </div>
+        <p class="page-foot">主分数优先用 Canvas 官方成绩；官方没有分数时用「构成估算」补位（按作业分组权重与已评分作业计算）。</p>
         ${recent.length ? `<section class="section">
           <div class="section-head"><h2>最近出分</h2></div>
           <div class="card list">${recent.slice(0, 8).map(({ a, c }) => {
@@ -2322,7 +2387,7 @@
         ${attachments.length ? `<div class="card list attach-list">
           ${attachments.map((f) => `<a class="row" href="${esc(f.url)}" target="_blank" rel="noopener">
             <span class="row-ico">${icon('file')}</span>
-            <span class="row-main"><span class="row-title">${esc(f.filename || f.display_name || '附件')}</span><span class="row-meta"><span>${esc(f.content_type || '')}</span></span></span>
+            <span class="row-main"><span class="row-title">${esc(f.filename || f.display_name || '附件')}</span><span class="row-meta"><span>${esc(formatFileMeta(f))}</span></span></span>
             ${icon('download', 'row-arrow')}</a>`).join('')}
         </div>` : ''}
         <div class="rich-text detail-desc">${a.description ? sanitizeHtml(a.description) : '<p class="muted">老师没有写作业说明。</p>'}</div>
@@ -2384,6 +2449,17 @@
     markSeen([topicId]);
     updateChrome();
     $$(`#app a[href^="#/course/${courseId}/ann/${topicId}"] .mini-dot`).forEach((el) => el.classList.remove('unread'));
+    const unreadNow = badges().feed;
+    const feedSub = $('#feed-sub');
+    if (feedSub) feedSub.innerHTML = unreadNow ? `最近 45 天 · <b class="t-accent">${unreadNow} 条未读</b>` : '最近 45 天 · 全部已读';
+    const feedReadBtn = $('.feed-read-btn');
+    if (feedReadBtn && !unreadNow) feedReadBtn.remove();
+    const homeUnreadStat = $('.stat[href="#/feed"]');
+    if (homeUnreadStat) {
+      const bEl = homeUnreadStat.querySelector('b');
+      if (bEl) bEl.textContent = String(unreadNow);
+      homeUnreadStat.classList.toggle('is-zero', !unreadNow);
+    }
     panelBody.innerHTML = panelBar(courseId, canvasHref(a.htmlUrl || fallback)) + `
       <article class="panel-pad detail">
         <p class="eyebrow">${icon('megaphone')} 公告</p>
@@ -2412,7 +2488,7 @@
       });
       (peek(`modules:${c.id}`) || []).forEach((m) => (m.items || []).forEach((item) => {
         const type = String(item.type || '').toLowerCase();
-        const slug = item.page_url || (item.url || '').split('/pages/')[1];
+        const slug = extractPageSlug(item);
         if (type === 'page' && slug) out.push({ group: '资料', title: item.title, sub: `${courseCode(c)} · ${m.name}`, icon: 'page', href: `#/course/${c.id}/page/${encodeURIComponent(slug)}?from=modules`, color: courseColor(c) });
         else if (type === 'file' && item.content_id) out.push({ group: '资料', title: item.title, sub: `${courseCode(c)} · ${m.name}`, icon: 'file', file: item.content_id, fileHref: item.html_url, color: courseColor(c) });
       }));
