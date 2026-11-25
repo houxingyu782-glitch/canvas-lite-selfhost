@@ -225,6 +225,12 @@ async function main() {
   ok((await page.locator('#panel .detail-desc script').count()) === 0, 'script 标签被移除');
   ok((await page.locator('#panel .detail-desc [onclick]').count()) === 0, 'onclick 属性被移除');
   ok((await page.textContent('#panel .facts')).includes('18'), '显示得分');
+  await page.waitForSelector('#panel .rubric-list');
+  const rubricText = (await page.textContent('#panel .rubric-list')).replace(/\s+/g, ' ');
+  ok(rubricText.includes('核心观点提炼') && rubricText.includes('8 / 10') && rubricText.includes('命名规范'), '显示评分细则每项得分与评语');
+  const commentText = (await page.textContent('#panel .comment-list')).replace(/\s+/g, ' ');
+  ok(commentText.includes('TA Grace') && commentText.includes('函数短小原则'), '显示老师评语');
+  ok((await page.locator('#panel .comment-list img').count()) === 0, '评语 HTML 按纯文本转义');
   await shot(page, '08-assignment.png', false);
   await page.click('#panel [data-action="panel-back"]');
   await page.waitForURL('**/#/course/101?tab=assignments');

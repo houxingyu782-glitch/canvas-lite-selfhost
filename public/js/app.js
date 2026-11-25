@@ -12,7 +12,7 @@
 
   const API = window.CanvasAPI;
   const config = API.loadConfig();
-  const VERSION = '2.3.1';
+  const VERSION = '2.4.0';
 
   const root = document.documentElement;
   const app = document.getElementById('app');
@@ -2345,9 +2345,10 @@
   async function assignmentDetail({ params, seq }) {
     const [courseId, assignmentId] = params;
     const fallback = canvasHref(`/courses/${courseId}/assignments/${assignmentId}`);
-    // 课程作业列表里已经有这条：先秒开，再拿完整版
+    // 优先用缓存里的完整版或列表项秒开，同时拉取最新详情（含评语与 rubric）
     const list = peek(`assignments:${courseId}`);
-    const quick = Array.isArray(list) ? list.find((a) => String(a.id) === String(assignmentId)) : null;
+    const quick = peek(`assignment:${courseId}:${assignmentId}`)
+      || (Array.isArray(list) ? list.find((a) => String(a.id) === String(assignmentId)) : null);
     if (quick) panelBody.innerHTML = assignmentHtml(quick, courseId);
     const res = await settle(cached(`assignment:${courseId}:${assignmentId}`, 30000, () => API.assignment(courseId, assignmentId), true));
     if (panelStale(seq)) return;
@@ -2359,6 +2360,109 @@
     const top = panelBody.scrollTop;
     panelBody.innerHTML = assignmentHtml(res.data, courseId);
     panelBody.scrollTop = top;
+  }
+
+  function rubricSectionHtml(a, sub) {
+    const criteria = Array.isArray(a && a.rubric) ? a.rubric : [];
+    const assessment = sub && sub.rubric_assessment && typeof sub.rubric_assessment === 'object' ? sub.rubric_assessment : null;
+    if (!criteria.length && (!assessment || !Object.keys(assessment).length)) return '';
+
+    const seenIds = new Set();
+    const rows = criteria.map((c) => {
+      const id = String(c.id || '');
+      if (id) seenIds.add(id);
+      const item = assessment && id ? assessment[id] : null;
+      const rating = item && item.rating_id != null && Array.isArray(c.ratings)
+        ? c.ratings.find((r) => String(r.id) === String(item.rating_id))
+        : null;
+      const maxPoints = c.points != null && Number.isFinite(Number(c.points)) ? Number(c.points) : null;
+      const points = item && item.points != null && Number.isFinite(Number(item.points)) ? Number(item.points) : null;
+      return {
+        title: c.description || '评分项',
+        longDesc: c.long_description || '',
+        maxPoints,
+        points,
+        ratingLabel: rating && rating.description ? rating.description : '',
+        comment: item && item.comments ? String(item.comments).trim() : '',
+      };
+    });
+    if (assessment) {
+      for (const [key, item] of Object.entries(assessment)) {
+        if (seenIds.has(key) || !item || typeof item !== 'object') continue;
+        const points = item.points != null && Number.isFinite(Number(item.points)) ? Number(item.points) : null;
+        rows.push({
+          title: item.description || '评分项',
+          longDesc: '',
+          maxPoints: null,
+          points,
+          ratingLabel: '',
+          comment: item.comments ? String(item.comments).trim() : '',
+        });
+      }
+    }
+    if (!rows.length) return '';
+
+    const assessed = rows.some((r) => r.points != null);
+    const totalMax = rows.reduce((s, r) => s + (r.maxPoints || 0), 0);
+    const totalGot = rows.reduce((s, r) => s + (r.points || 0), 0);
+
+    return `<section class="detail-section">
+      <div class="detail-section-head">
+        <h2>${assessed ? '评分细则' : '评分标准'}</h2>
+        ${assessed && totalMax > 0 ? `<span class="detail-section-meta"><b>${esc(formatScore(totalGot))}</b> / ${esc(formatScore(totalMax))} 分</span>`
+          : totalMax > 0 ? `<span class="detail-section-meta">共 ${esc(formatScore(totalMax))} 分</span>` : ''}
+      </div>
+      <div class="card list rubric-list">
+        ${rows.map((r) => {
+          const pct = r.maxPoints > 0 && r.points != null ? Math.max(0, Math.min(100, (r.points / r.maxPoints) * 100)) : null;
+          return `<div class="rubric-row">
+            <div class="rubric-top">
+              <span class="rubric-title">${esc(r.title)}</span>
+              <span class="rubric-score">${r.points != null
+                ? `<b>${esc(formatScore(r.points))}</b>${r.maxPoints != null ? `<small> / ${esc(formatScore(r.maxPoints))}</small>` : ''}`
+                : (r.maxPoints != null ? `<small>满分 ${esc(formatScore(r.maxPoints))}</small>` : '')}</span>
+            </div>
+            ${pct != null ? `<span class="bar rubric-bar"><span style="width:${pct}%"></span></span>` : ''}
+            ${r.ratingLabel || r.comment || (!assessed && r.longDesc) ? `<div class="rubric-sub">
+              ${r.ratingLabel ? chip('muted', r.ratingLabel) : ''}
+              ${r.comment ? `<p class="rubric-comment">${esc(r.comment)}</p>` : ''}
+              ${!assessed && !r.comment && r.longDesc ? `<p class="rubric-desc">${esc(r.longDesc)}</p>` : ''}
+            </div>` : ''}
+          </div>`;
+        }).join('')}
+      </div>
+    </section>`;
+  }
+
+  function commentsSectionHtml(sub) {
+    const comments = Array.isArray(sub && sub.submission_comments)
+      ? sub.submission_comments.filter((c) => c && (String(c.comment || '').trim() || (Array.isArray(c.attachments) && c.attachments.length)))
+      : [];
+    if (!comments.length) return '';
+
+    return `<section class="detail-section">
+      <div class="detail-section-head">
+        <h2>老师评语</h2>
+        <span class="detail-section-meta">${comments.length} 条</span>
+      </div>
+      <div class="card list comment-list">
+        ${comments.map((c) => {
+          const author = c.author_name || (c.author && (c.author.display_name || c.author.short_name)) || '老师';
+          const at = c.created_at ? fmtDateTime(c.created_at) : '';
+          const body = String(c.comment || '').trim();
+          const atts = Array.isArray(c.attachments) ? c.attachments : [];
+          return `<div class="comment-item">
+            <div class="comment-head">
+              <b class="comment-author">${esc(author)}</b>
+              ${at ? `<span class="comment-time">${esc(at)}</span>` : ''}
+            </div>
+            ${body ? `<p class="comment-body">${esc(body)}</p>` : ''}
+            ${atts.length ? `<div class="comment-atts">${atts.map((f) => `<a class="comment-att" href="${esc(f.url || '#')}" target="_blank" rel="noopener">
+              ${icon('file')}<span>${esc(f.filename || f.display_name || '附件')}</span>${icon('download')}</a>`).join('')}</div>` : ''}
+          </div>`;
+        }).join('')}
+      </div>
+    </section>`;
   }
 
   function assignmentHtml(a, courseId) {
@@ -2384,6 +2488,8 @@
           ${sub.submitted_at ? `<div><dt>${icon('check')} 已提交</dt><dd>${esc(fmtDateTime(sub.submitted_at))}</dd></div>` : ''}
           ${sub.score != null ? `<div><dt>${icon('chart')} 得分</dt><dd><b>${esc(formatScore(sub.score))}</b> / ${esc(formatScore(a.points_possible))}${pct != null ? ` <small>${pct.toFixed(0)}%</small>` : ''}</dd></div>` : ''}
         </dl>
+        ${rubricSectionHtml(a, sub)}
+        ${commentsSectionHtml(sub)}
         ${attachments.length ? `<div class="card list attach-list">
           ${attachments.map((f) => `<a class="row" href="${esc(f.url)}" target="_blank" rel="noopener">
             <span class="row-ico">${icon('file')}</span>
