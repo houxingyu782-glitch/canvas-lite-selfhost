@@ -190,10 +190,12 @@ body.has-chrome .app { padding-bottom: calc(var(--tabbar-h) + var(--safe-b)); }
 .logo {
   display: grid; place-items: center;
   width: 30px; height: 30px; border-radius: 9px;
-  background: linear-gradient(135deg, #6366f1, #8b5cf6);
-  box-shadow: 0 4px 12px -4px rgba(99, 102, 241, .7);
+  background:
+    radial-gradient(circle at 25% 12%, rgba(255, 255, 255, .28), transparent 60%),
+    linear-gradient(135deg, #5b5bf6, #6d4ff2 50%, #9b4ff0);
+  box-shadow: 0 4px 12px -4px rgba(91, 91, 246, .7);
 }
-.logo svg { width: 20px; height: 20px; }
+.logo svg { width: 21px; height: 21px; }
 .sb-search {
   display: flex; align-items: center; gap: 8px;
   height: 36px; padding: 0 8px 0 10px;

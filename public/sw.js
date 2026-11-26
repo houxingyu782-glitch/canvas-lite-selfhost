@@ -1,7 +1,7 @@
 /* Canvas Lite · Service Worker
  * 只缓存应用外壳；Canvas 数据永远走网络，避免看到过期成绩。
  */
-const VERSION = 'canvas-lite-v2.4.0';
+const VERSION = 'canvas-lite-v2.4.1';
 const SHELL = [
   './',
   './index.html',
@@ -11,6 +11,8 @@ const SHELL = [
   './js/app.js',
   './manifest.webmanifest',
   './icons/icon.svg',
+  './icons/icon-32.png',
+  './icons/apple-touch-icon.png',
   './icons/icon-192.png',
   './icons/icon-512.png',
 ];

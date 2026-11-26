@@ -12,7 +12,7 @@
 
   const API = window.CanvasAPI;
   const config = API.loadConfig();
-  const VERSION = '2.4.0';
+  const VERSION = '2.4.1';
 
   const root = document.documentElement;
   const app = document.getElementById('app');
@@ -1090,7 +1090,7 @@
   }
 
   function logoSvg() {
-    return `<span class="logo" aria-hidden="true"><svg viewBox="0 0 512 512" fill="none"><path d="M340 182a112 112 0 1 0 0 148" stroke="#fff" stroke-width="56" stroke-linecap="round"/><circle cx="352" cy="256" r="26" fill="#fff"/></svg></span>`;
+    return `<span class="logo" aria-hidden="true"><svg viewBox="0 0 512 512" fill="none"><path d="M334.85 171.15A120 120 0 1 0 334.85 340.85" stroke="#fff" stroke-width="60" stroke-linecap="round"/><circle cx="366" cy="256" r="30" fill="#fff"/></svg></span>`;
   }
 
   /** 页面顶部：大标题 + 操作按钮（手机上还有搜索和头像） */
