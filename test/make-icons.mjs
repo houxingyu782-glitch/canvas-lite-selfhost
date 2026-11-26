@@ -1,6 +1,11 @@
 /**
  * 生成 PWA 图标（需要 Playwright 的 Chromium）
- * 用法：node test/make-icons.mjs
+ * 用法：npm run icons
+ *
+ * icon.svg 是唯一的源文件（圆角方块，透明圆角），其余都从这里派生：
+ *   - icon-32 / 192 / 512：浏览器标签页、桌面安装用，保留圆角
+ *   - maskable-512：安卓自适应图标，背景铺满，图形缩进 80% 安全区
+ *   - apple-touch-icon：iOS 主屏幕，背景铺满（iOS 会把透明圆角填成黑色）
  */
 import { chromium } from 'playwright';
 import fs from 'node:fs/promises';
@@ -12,18 +17,12 @@ const OUT = path.resolve(__dirname, '..', 'public', 'icons');
 
 const svg = await fs.readFile(path.join(OUT, 'icon.svg'), 'utf8');
 
-const maskable = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
-  <defs>
-    <linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0" stop-color="#4f46e5"/><stop offset="0.55" stop-color="#6d4bf0"/><stop offset="1" stop-color="#a855f7"/>
-    </linearGradient>
-  </defs>
-  <rect width="512" height="512" fill="url(#g)"/>
-  <g transform="translate(256 256) scale(0.62) translate(-256 -256)">
-    <path d="M340 182a112 112 0 1 0 0 148" fill="none" stroke="#fff" stroke-width="52" stroke-linecap="round"/>
-    <circle cx="352" cy="256" r="24" fill="#fff"/>
-  </g>
-</svg>`;
+/** 背景铺满（去掉圆角），图形按比例缩放到中心 */
+function fullBleed(scale) {
+  return svg
+    .replace(/ rx="114"/g, '')
+    .replace('<g filter="url(#sh)">', `<g filter="url(#sh)" transform="translate(256 256) scale(${scale}) translate(-256 -256)">`);
+}
 
 const browser = await chromium.launch({ args: ['--no-sandbox'] });
 
@@ -37,9 +36,10 @@ async function render(markup, size, file) {
   console.log('wrote', file);
 }
 
+await render(svg, 32, 'icon-32.png');
 await render(svg, 192, 'icon-192.png');
 await render(svg, 512, 'icon-512.png');
-await render(maskable, 512, 'maskable-512.png');
-await render(maskable, 180, 'apple-touch-icon.png');
+await render(fullBleed(0.74), 512, 'maskable-512.png');
+await render(fullBleed(0.9), 180, 'apple-touch-icon.png');
 
 await browser.close();
